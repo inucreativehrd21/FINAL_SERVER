@@ -1,0 +1,313 @@
+import React, { useState, useRef, useEffect } from 'react'
+import api from '../../services/api'
+import './Chatbot.css'
+
+function Chatbot() {
+  const [messages, setMessages] = useState([
+    {
+      role: 'assistant',
+      content: '안녕하세요! 코딩에 대해 궁금한 것을 자유롭게 물어보세요.'
+    }
+  ])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [questionHistory, setQuestionHistory] = useState([])
+  const [bookmarks, setBookmarks] = useState([])
+  const messagesEndRef = useRef(null)
+
+  const exampleQuestions = [
+    '파이썬에서 리스트와 튜플의 차이가 뭔가요?',
+    'HTML에서 <div>와 <span>은 어떤 차이가 있나요?',
+    'overfitting(과적합)을 줄이는 방법'
+  ]
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  useEffect(() => {
+    fetchBookmarks()
+  }, [])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const fetchBookmarks = async () => {
+    try {
+      const response = await api.get('/chatbot/bookmarks/')
+      setBookmarks(response.data.data || [])
+    } catch (error) {
+      console.error('Failed to fetch bookmarks:', error)
+    }
+  }
+
+  const handleExampleQuestion = (question) => {
+    setInput(question)
+  }
+
+  const handleNewChat = () => {
+    setMessages([
+      {
+        role: 'assistant',
+        content: '안녕하세요! 코딩에 대해 궁금한 것을 자유롭게 물어보세요.'
+      }
+    ])
+    setInput('')
+  }
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return
+
+    const userMessage = { role: 'user', content: input }
+    setMessages(prev => [...prev, userMessage])
+
+    // 질문 기록에 추가 (최대 10개)
+    setQuestionHistory(prev => {
+      const newHistory = [input, ...prev.filter(q => q !== input)]
+      return newHistory.slice(0, 10)
+    })
+
+    setInput('')
+    setLoading(true)
+
+    try {
+      const response = await api.post('/chatbot/chat/', {
+        message: input,
+        history: messages
+      })
+
+      const assistantMessage = {
+        role: 'assistant',
+        content: response.data.data.response,
+        sources: response.data.data.sources
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      const errorMessage = {
+        role: 'assistant',
+        content: '죄송합니다. 응답을 생성하는 중 오류가 발생했습니다.'
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  const handleDeleteHistory = (index) => {
+    setQuestionHistory(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleBookmark = async (messageIndex) => {
+    const message = messages[messageIndex]
+    if (message.role !== 'assistant') return
+
+    try {
+      await api.post('/chatbot/bookmark/', {
+        content: message.content,
+        sources: message.sources
+      })
+
+      alert('북마크에 추가되었습니다.')
+      fetchBookmarks()
+    } catch (error) {
+      console.error('Failed to bookmark:', error)
+      alert('북마크 추가에 실패했습니다.')
+    }
+  }
+
+  const handleCopy = (content) => {
+    navigator.clipboard.writeText(content)
+    alert('클립보드에 복사되었습니다.')
+  }
+
+  const handleDeleteBookmark = async (bookmarkId) => {
+    try {
+      await api.delete(`/chatbot/bookmark/${bookmarkId}/`)
+      fetchBookmarks()
+    } catch (error) {
+      console.error('Failed to delete bookmark:', error)
+      alert('북마크 삭제에 실패했습니다.')
+    }
+  }
+
+  return (
+    <div className="chatbot-page">
+      <div className="chat-section">
+        <div className="chat-header">
+          <div className="bot-icon">🤖</div>
+          <p>안녕하세요! 코딩에 대해 궁금한 것을 자유롭게 물어보세요.</p>
+        </div>
+
+        {/* 예시 질문 */}
+        <div className="example-questions">
+          <div className="example-label">💡 예시 질문</div>
+          {exampleQuestions.map((question, index) => (
+            <button
+              key={index}
+              className="example-btn"
+              onClick={() => handleExampleQuestion(question)}
+            >
+              {question}
+            </button>
+          ))}
+        </div>
+
+        <div className="messages-container">
+          {messages.map((message, index) => (
+            <div key={index} className={`message ${message.role}`}>
+              <div className="message-avatar">
+                {message.role === 'user' ? '👤' : '🤖'}
+              </div>
+              <div className="message-content">
+                <div className="message-text">{message.content}</div>
+                {message.sources && message.sources.length > 0 && (
+                  <div className="message-sources">
+                    <strong>참고 문서:</strong>
+                    <ul>
+                      {message.sources.map((source, idx) => (
+                        <li key={idx}>{source}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {message.role === 'assistant' && (
+                  <div className="message-actions">
+                    <button
+                      className="action-btn"
+                      onClick={() => handleBookmark(index)}
+                      title="북마크"
+                    >
+                      ⭐
+                    </button>
+                    <button
+                      className="action-btn"
+                      onClick={() => handleCopy(message.content)}
+                      title="복사"
+                    >
+                      📋
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="message assistant">
+              <div className="message-avatar">🤖</div>
+              <div className="message-content">
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="input-container">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="질문을 입력하세요."
+            disabled={loading}
+          />
+          <button
+            className="send-btn"
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+          >
+            전송
+          </button>
+        </div>
+
+        <button className="new-chat-btn" onClick={handleNewChat}>
+          새로운 대화 시작
+        </button>
+      </div>
+
+      <div className="history-section">
+        {/* 질문 기록 */}
+        <div className="sidebar-block">
+          <div className="history-header">
+            <span>📝 내 최근 질문 기록</span>
+          </div>
+
+          <div className="history-list">
+            {questionHistory.length === 0 ? (
+              <div className="no-history">
+                <p>아직 질문 기록이 없습니다.</p>
+              </div>
+            ) : (
+              questionHistory.slice(0, 5).map((question, index) => (
+                <div key={index} className="history-item">
+                  <div className="history-icon">💬</div>
+                  <div className="history-question">{question}</div>
+                  <button
+                    className="history-delete-btn"
+                    onClick={() => handleDeleteHistory(index)}
+                    title="삭제"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* 북마크 */}
+        <div className="sidebar-block">
+          <div className="history-header">
+            <span>⭐ 북마크 ({bookmarks.length})</span>
+          </div>
+
+          <div className="history-list">
+            {bookmarks.length === 0 ? (
+              <div className="no-history">
+                <p>저장된 북마크가 없습니다.</p>
+              </div>
+            ) : (
+              bookmarks.map((bookmark) => (
+                <div key={bookmark.id} className="bookmark-item-mini">
+                  <div className="bookmark-content-mini">{bookmark.content}</div>
+                  <div className="bookmark-actions-mini">
+                    <button
+                      className="action-btn-mini"
+                      onClick={() => handleCopy(bookmark.content)}
+                      title="복사"
+                    >
+                      📋
+                    </button>
+                    <button
+                      className="action-btn-mini delete"
+                      onClick={() => handleDeleteBookmark(bookmark.id)}
+                      title="삭제"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default Chatbot

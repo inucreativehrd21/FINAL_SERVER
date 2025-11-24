@@ -1,0 +1,61 @@
+{
+  "test_time": "2025-11-19T08:39:00.929859",
+  "base_url": "http://backend:8000/api/v1",
+  "results": {
+    "PT_001_로그인_응답시간": {
+      "avg_ms": 6.43,
+      "min_ms": 4.31,
+      "max_ms": 10.86,
+      "success": 5,
+      "fail": 0,
+      "iterations": 5
+    },
+    "PT_002_문제목록_로딩시간": {
+      "avg_ms": 10.48,
+      "min_ms": 6.41,
+      "max_ms": 14.06,
+      "success": 5,
+      "fail": 0,
+      "iterations": 5
+    },
+    "PT_003_힌트생성_응답시간": {
+      "avg_ms": 205.76,
+      "min_ms": 170.63,
+      "max_ms": 238.95,
+      "success": 0,
+      "fail": 3,
+      "iterations": 3
+    },
+    "PT_004_코드실행_응답시간": {
+      "avg_ms": 439.8,
+      "min_ms": 401.15,
+      "max_ms": 492.19,
+      "success": 5,
+      "fail": 0,
+      "iterations": 5
+    },
+    "PT_005_동시사용자_부하테스트": {
+      "concurrent_users": 50,
+      "success": 50,
+      "fail": 0,
+      "avg_ms": 35.87,
+      "max_ms": 56.64
+    },
+    "PT_006_마이페이지_통계로딩": {
+      "avg_ms": 80.63,
+      "min_ms": 67.06,
+      "max_ms": 110.08,
+      "success": 5,
+      "fail": 0,
+      "iterations": 5
+    },
+    "PT_007_로드맵_조회시간": {
+      "avg_ms": 21.43,
+      "min_ms": 16.21,
+      "max_ms": 30.68,
+      "success": 5,
+      "fail": 0,
+      "iterations": 5
+    }
+  }
+}

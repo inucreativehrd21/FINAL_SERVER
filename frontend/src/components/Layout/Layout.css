@@ -1,0 +1,129 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* 상단 네비게이션 바 */
+.top-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  height: 60px;
+  background: rgba(0, 0, 0, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* 좌측 네비게이션: 로고 + 문제 선택 + 문답 챗봇 */
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 우측 네비게이션: 마이페이지 + 관리자 + 로그아웃 */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navbar-brand {
+  cursor: pointer;
+  transition: transform 0.2s;
+  margin-right: 1rem;
+}
+
+.navbar-brand:hover {
+  transform: scale(1.1);
+}
+
+.logo-symbol {
+  color: white;
+  font-size: 2rem;
+  font-weight: bold;
+  font-style: italic;
+}
+
+.nav-link {
+  padding: 0.5rem 1.25rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  font-weight: 400;
+  font-size: 1rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.nav-link.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 600;
+}
+
+.nav-link.admin {
+  color: #ffd700;
+  font-weight: 600;
+}
+
+
+.logout-btn {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 400;
+  transition: all 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  background: #f5f5f5;
+}
+
+@media (max-width: 768px) {
+  .top-navbar {
+    padding: 0 1rem;
+    height: auto;
+    flex-wrap: wrap;
+  }
+
+  .nav-left,
+  .nav-right {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 0.5rem 0;
+  }
+
+  .nav-right {
+    justify-content: flex-end;
+  }
+
+  .navbar-brand {
+    margin-right: 0.5rem;
+  }
+}

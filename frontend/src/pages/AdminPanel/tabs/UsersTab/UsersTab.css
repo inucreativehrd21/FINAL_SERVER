@@ -1,0 +1,189 @@
+/* Users Tab Styles */
+
+.section-hint {
+  font-size: 0.9rem;
+  color: #999;
+  margin-top: 0.5rem;
+}
+
+/* Skill management styles */
+.skill-input {
+  width: 80px;
+  padding: 0.4rem;
+  border: 2px solid #333;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.skill-input:disabled {
+  background: #f0f0f0;
+  cursor: not-allowed;
+  border-color: #ccc;
+}
+
+.skill-select {
+  padding: 0.4rem 0.6rem;
+  border: 2px solid #333;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: white;
+  cursor: pointer;
+}
+
+.skill-select:disabled {
+  background: #f0f0f0;
+  cursor: not-allowed;
+  border-color: #ccc;
+}
+
+.skill-score {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Mode badges */
+.mode-badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.mode-badge.auto {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.mode-badge.manual {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* Hint level badges */
+.hint-level {
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.hint-level.level-1 {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.hint-level.level-2 {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.hint-level.level-3 {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+/* Action buttons */
+.action-btn.edit {
+  background: #333;
+  color: white;
+}
+
+.action-btn.edit:hover {
+  background: #5568d3;
+}
+
+.action-btn.save {
+  background: #4caf50;
+  color: white;
+}
+
+.action-btn.save:hover {
+  background: #45a049;
+}
+
+.action-btn.cancel {
+  background: #999;
+  color: white;
+}
+
+.action-btn.cancel:hover {
+  background: #888;
+}
+
+/* Skill info panel */
+.skill-info-panel {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.skill-info-panel h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.info-item {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.info-item strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.info-item p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  color: #666;
+  line-height: 1.5;
+}
+
+/* Role badges */
+.role-badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.role-badge.admin {
+  background: #ffe8cc;
+  color: #e65100;
+}
+
+.role-badge.user {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+/* Role button */
+.action-btn.role {
+  background: #ff9800;
+  color: white;
+}
+
+.action-btn.role:hover:not(:disabled) {
+  background: #f57c00;
+}
+
+.action-btn.role:disabled,
+.action-btn.role.disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}

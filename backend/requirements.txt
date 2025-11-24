@@ -1,0 +1,46 @@
+# Django Core
+Django==5.0.1
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# Authentication
+djangorestframework-simplejwt==5.3.1
+PyJWT==2.8.0
+
+# Database
+mysqlclient==2.2.1
+psycopg2-binary==2.9.9
+
+# Vector Database
+chromadb==0.4.22
+sentence-transformers==2.3.1
+
+# AI/ML
+torch==2.1.2
+transformers==4.36.2
+
+# API & HTTP
+requests==2.31.0
+httpx==0.26.0
+
+# Code Execution
+subprocess32==3.5.4; python_version < '3'
+
+# Utilities
+python-dotenv==1.0.0
+pandas==2.1.4
+numpy==1.26.3
+
+# Development
+pytest==7.4.4
+pytest-django==4.7.0
+black==23.12.1
+flake8==7.0.0
+
+# Production
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# Code Analysis
+radon==6.0.1
+pycodestyle==2.11.1
