@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # MySQL과 Redis는 공유하므로 여기서는 정의하지 않음
+
+  # Django 백엔드 - Green
+  backend_green:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hint_system_backend_green
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --reload
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8002:8000"  # Green은 8002 포트 사용
+    env_file:
+      - .env
+    networks:
+      - hint_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # React 프론트엔드 - Green
+  frontend_green:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hint_system_frontend_green
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3002:3000"  # Green은 3002 포트 사용
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      - backend_green
+    networks:
+      - hint_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  static_volume:
+    external: true
+    name: final_server_static_volume
+  media_volume:
+    external: true
+    name: final_server_media_volume
+
+networks:
+  hint_network:
+    external: true
+    name: final_server_hint_network

@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # MySQL 데이터베이스
+  # MySQL 데이터베이스 (공유)
   db:
     image: mysql:8.0
     container_name: hint_system_db
@@ -22,7 +22,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Redis 캐싱
+  # Redis 캐싱 (공유)
   redis:
     image: redis:7-alpine
     container_name: hint_system_redis
@@ -34,19 +34,19 @@ services:
       - hint_network
     restart: unless-stopped
 
-  # Django 백엔드
-  backend:
+  # Django 백엔드 - Blue
+  backend_blue:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: hint_system_backend
+    container_name: hint_system_backend_blue
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --reload
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     ports:
-      - "8000:8000"
+      - "8001:8000"  # Blue는 8001 포트 사용
     env_file:
       - .env
     depends_on:
@@ -56,47 +56,37 @@ services:
         condition: service_started
     networks:
       - hint_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
 
-  # React 프론트엔드
-  frontend:
+  # React 프론트엔드 - Blue
+  frontend_blue:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: hint_system_frontend
+    container_name: hint_system_frontend_blue
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "3000:3000"
+      - "3001:3000"  # Blue는 3001 포트 사용
     environment:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
     depends_on:
-      - backend
+      - backend_blue
     networks:
       - hint_network
-    restart: unless-stopped
-
-  # Nginx Reverse Proxy
-  nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
-    container_name: hint_system_nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - static_volume:/app/backend/staticfiles
-      - media_volume:/app/backend/media
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - backend
-      - frontend
-    networks:
-      - hint_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
 
 volumes:

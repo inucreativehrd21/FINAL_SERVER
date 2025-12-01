@@ -1,13 +1,20 @@
 """
 URL configuration for hint system project.
 """
-from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.http import JsonResponse
+from django.urls import path, include
+
+
+def api_root(_request):
+    return JsonResponse({"status": "ok"})
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1', api_root),
+    path('api/v1/', api_root),
 
     # API v1 엔드포인트 (탭별 모듈화)
     path('api/v1/auth/', include('apps.authentication.urls')),

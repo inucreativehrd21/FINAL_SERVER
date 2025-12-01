@@ -98,3 +98,6 @@ logs/
 *.key
 secrets/
 credentials/
+
+# Nginx dynamic config
+nginx/conf.d/
