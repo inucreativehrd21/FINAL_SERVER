@@ -189,10 +189,9 @@ function Chatbot() {
               <div className="message-content">
                 <div className="message-text">{message.content}</div>
 
-                {/* 🔧 개선: Sources 렌더링 (객체 타입 안전 처리 + URL 링크) */}
+                {/* Sources 렌더링 (객체 타입 안전 처리 + URL 링크) */}
                 {message.sources && message.sources.length > 0 && (
                   <div className="message-sources">
-                    <strong>참고 문서:</strong>
                     <ul>
                       {message.sources.map((source, idx) => (
                         <li key={idx}>
