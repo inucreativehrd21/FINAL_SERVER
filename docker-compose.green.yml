@@ -9,7 +9,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: hint_system_backend_green
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --reload
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120 --reload
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles

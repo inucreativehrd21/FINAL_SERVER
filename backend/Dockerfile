@@ -19,5 +19,5 @@ COPY . .
 # 로그 디렉토리 생성
 RUN mkdir -p logs
 
-# Gunicorn 실행
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+# Gunicorn 실행 (timeout 120초 - RAG 요청 대응)
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
