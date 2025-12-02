@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # MySQL 데이터베이스 (공유 - 항상 실행)
+  db:
+    image: mysql:8.0
+    container_name: hint_system_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - hint_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    restart: unless-stopped
+
+  # Redis 캐싱 (공유 - 항상 실행)
+  redis:
+    image: redis:7-alpine
+    container_name: hint_system_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hint_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    name: final_server_mysql_data
+  redis_data:
+    name: final_server_redis_data
+  static_volume:
+    name: final_server_static_volume
+  media_volume:
+    name: final_server_media_volume
+
+networks:
+  hint_network:
+    name: final_server_hint_network
+    driver: bridge

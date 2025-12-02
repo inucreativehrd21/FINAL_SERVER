@@ -51,19 +51,26 @@ echo -e "${YELLOW}새로 배포할 환경: ${NEW_ENV}${NC}"
 echo ""
 
 # Step 1: 최신 코드 pull
-echo -e "${YELLOW}[1/7] Pulling latest code...${NC}"
+echo -e "${YELLOW}[1/8] Pulling latest code...${NC}"
 git pull origin main
 
-# Step 2: 새 환경 컨테이너 빌드 및 시작
-echo -e "${YELLOW}[2/7] Building and starting ${NEW_ENV} environment...${NC}"
+# Step 2: 공유 인프라 확인 및 시작 (DB, Redis)
+echo -e "${YELLOW}[2/8] Ensuring base infrastructure is running...${NC}"
+sudo docker-compose -f docker-compose.base.yml up -d
+echo -e "${GREEN}✓ Base infrastructure ready (DB, Redis)${NC}"
+sleep 5
+
+# Step 3: 새 환경 컨테이너 빌드 및 시작
+echo -e "${YELLOW}[3/8] Building and starting ${NEW_ENV} environment...${NC}"
+echo -e "${BLUE}Note: Base infrastructure (DB, Redis) remains running during build${NC}"
 sudo docker-compose -f docker-compose.${NEW_ENV}.yml up -d --build
 
-# Step 3: 새 컨테이너가 준비될 때까지 대기
-echo -e "${YELLOW}[3/7] Waiting for ${NEW_ENV} containers to be ready...${NC}"
+# Step 4: 새 컨테이너가 준비될 때까지 대기
+echo -e "${YELLOW}[4/8] Waiting for ${NEW_ENV} containers to be ready...${NC}"
 sleep 20
 
-# Step 4: 헬스체크
-echo -e "${YELLOW}[4/7] Health checking ${NEW_ENV} environment...${NC}"
+# Step 5: 헬스체크
+echo -e "${YELLOW}[5/8] Health checking ${NEW_ENV} environment...${NC}"
 MAX_RETRIES=30
 RETRY_COUNT=0
 
@@ -105,8 +112,8 @@ done
 echo -e "${GREEN}All health checks passed!${NC}"
 echo ""
 
-# Step 5: Nginx upstream 설정 변경
-echo -e "${YELLOW}[5/7] Switching Nginx upstream to ${NEW_ENV}...${NC}"
+# Step 6: Nginx upstream 설정 변경
+echo -e "${YELLOW}[6/8] Switching Nginx upstream to ${NEW_ENV}...${NC}"
 
 # Nginx upstream 설정 파일 교체 (호스트에서 직접 - conf.d가 마운트되어 있음)
 sudo cp nginx/upstream.${NEW_ENV}.conf nginx/conf.d/upstream.conf
@@ -122,16 +129,17 @@ else
     exit 1
 fi
 
-# Step 6: Nginx reload (무중단)
-echo -e "${YELLOW}[6/7] Reloading Nginx...${NC}"
+# Step 7: Nginx reload (무중단)
+echo -e "${YELLOW}[7/8] Reloading Nginx...${NC}"
 sudo docker exec hint_system_nginx nginx -s reload
 echo -e "${GREEN}✓ Nginx reloaded successfully${NC}"
 
 # 짧은 대기 후 트래픽이 새 환경으로 흐르는지 확인
 sleep 3
 
-# Step 7: 이전 환경 컨테이너 중지
-echo -e "${YELLOW}[7/7] Stopping old ${CURRENT_ENV} environment...${NC}"
+# Step 8: 이전 환경 컨테이너 중지 (DB/Redis는 유지)
+echo -e "${YELLOW}[8/8] Stopping old ${CURRENT_ENV} environment...${NC}"
+echo -e "${BLUE}Note: Only stopping ${CURRENT_ENV} app containers (DB, Redis remain running)${NC}"
 sudo docker-compose -f docker-compose.${CURRENT_ENV}.yml down
 
 # 활성 환경 업데이트
