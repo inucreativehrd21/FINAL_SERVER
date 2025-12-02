@@ -1,7 +1,7 @@
 """
-Django REST API Views for Chatbot App
+Django REST API Views for Chatbot App (개선 버전)
 
-RunPod RAG 시스템과 통합된 챗봇 API
+RunPod RAG 시스템과 통합된 챗봇 API - 환경변수 호환성 개선
 
 복사 위치: backend/apps/chatbot/views.py
 """
@@ -26,10 +26,14 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 # RunPod RAG 서버 URL (환경변수에서 로드)
-RUNPOD_RAG_URL = os.environ.get('RUNPOD_RAG_URL', '')
+# RUNPOD_RAG_URL 또는 RUNPOD_CHATBOT_URL 지원
+RUNPOD_RAG_URL = (
+    os.environ.get('RUNPOD_RAG_URL') or
+    os.environ.get('RUNPOD_CHATBOT_URL', '')
+)
 
 if not RUNPOD_RAG_URL:
-    logger.warning("⚠️  RUNPOD_RAG_URL environment variable not set!")
+    logger.warning("⚠️  RUNPOD_RAG_URL or RUNPOD_CHATBOT_URL environment variable not set!")
 
 
 # === 채팅 API ===
@@ -124,7 +128,7 @@ def chat(request):
         response = requests.post(
             f"{RUNPOD_RAG_URL}/api/v1/chat",
             json=payload,
-            timeout=60  # 60초 타임아웃
+            timeout=90  # LangGraph RAG는 7-10초 소요
         )
 
         # 응답 처리
@@ -143,7 +147,8 @@ def chat(request):
 
                 logger.info(
                     f"[Chat] Response saved: message_id={assistant_message.id}, "
-                    f"sources={len(result.get('sources', []))}"
+                    f"sources={len(result.get('sources', []))}, "
+                    f"rag_type={result.get('metadata', {}).get('rag_type', 'unknown')}"
                 )
 
                 return Response({
@@ -172,7 +177,7 @@ def chat(request):
             }, status=status.HTTP_502_BAD_GATEWAY)
 
     except requests.exceptions.Timeout:
-        logger.error("[Chat] RAG server timeout")
+        logger.error("[Chat] RAG server timeout (90s)")
         return Response({
             'success': False,
             'error': 'RAG 서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
