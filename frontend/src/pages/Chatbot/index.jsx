@@ -158,11 +158,23 @@ function Chatbot() {
     }
   }
 
-  // 답변 본문에서 "📚 참고:" 섹션 제거하는 함수
-  const cleanAnswerContent = (content) => {
-    // "📚 참고:" 또는 "📚참고:" 이전 내용만 추출
+  // 답변 본문 포맷팅 함수 (출처 제거 + 가독성 개선)
+  const formatAnswerContent = (content) => {
+    // 1. "📚 참고:" 섹션 제거
     const parts = content.split(/📚\s*참고[:：]\s*/i)
-    return parts[0].trim()
+    let text = parts[0].trim()
+
+    // 2. 불릿 포인트(•, -, *, ·) 앞뒤로 줄바꿈 추가
+    text = text.replace(/([.!?])\s*([•\-\*·])\s*/g, '$1\n\n$2 ')
+    text = text.replace(/^([•\-\*·])\s*/gm, '$1 ')
+
+    // 3. 숫자 리스트 (1., 2., **1단계:, 등) 포맷팅
+    text = text.replace(/([.!?])\s*(\d+[.)]\s*|[*]{0,2}\d+단계[:：])/g, '$1\n\n$2')
+
+    // 4. 단락 구분 (두 줄바꿈을 유지)
+    text = text.replace(/\n\s*\n/g, '\n\n')
+
+    return text
   }
 
   return (
@@ -194,9 +206,9 @@ function Chatbot() {
                 {message.role === 'user' ? '👤' : '🤖'}
               </div>
               <div className="message-content">
-                <div className="message-text" style={{ whiteSpace: 'pre-wrap' }}>
+                <div className="message-text" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.8' }}>
                   {message.role === 'assistant'
-                    ? cleanAnswerContent(message.content)
+                    ? formatAnswerContent(message.content)
                     : message.content
                   }
                 </div>
