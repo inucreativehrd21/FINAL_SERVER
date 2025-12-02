@@ -17,6 +17,7 @@ import SolutionProposal from './pages/SolutionProposal'
 import ProblemProposal from './pages/ProblemProposal'
 import Survey from './pages/Survey'
 import Roadmap from './pages/Roadmap'
+import KakaoCallback from './pages/KakaoCallback'
 
 import './App.css'
 
@@ -36,6 +37,9 @@ function App() {
       {/* 로그인/회원가입 */}
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+
+      {/* 카카오 로그인 콜백 */}
+      <Route path="/oauth/kakao/callback" element={<KakaoCallback />} />
 
       {/* 인증된 사용자만 접근 가능한 페이지 */}
       <Route

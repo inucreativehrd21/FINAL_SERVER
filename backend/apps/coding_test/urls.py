@@ -4,6 +4,7 @@
 from django.urls import path
 from . import views
 from .hint_api import request_hint
+from .submission_api import submit_code as submit_code_v2
 from .ai_config_api import (
     get_ai_config,
     update_ai_config,
@@ -31,6 +32,7 @@ urlpatterns = [
     # 코드 실행
     path('execute/', views.execute_code, name='execute_code'),
     path('submit/', views.submit_code, name='submit_code'),
+    path('submit/v2/', submit_code_v2, name='submit_code_v2'),  # 12-메트릭 제출
 
     # 힌트
     path('hints/', request_hint, name='request_hint'),

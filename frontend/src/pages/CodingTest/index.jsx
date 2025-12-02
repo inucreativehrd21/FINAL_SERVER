@@ -16,7 +16,7 @@ function CodingTest() {
   const [loading, setLoading] = useState(false)
   const [customInputs, setCustomInputs] = useState([]) // 사용자가 추가한 입력들
   const [newInput, setNewInput] = useState('') // 새 입력 필드
-  const [outputMode, setOutputMode] = useState(1) // 1: 전체 출력, 2: 간단 출력
+  const [outputMode, setOutputMode] = useState(2) // 1: 전체 출력, 2: 간단 출력 (기본: 간단 출력)
   const [executionResults, setExecutionResults] = useState(null) // 다중 실행 결과
   const [hint, setHint] = useState('') // 힌트 응답
   const [hintLoading, setHintLoading] = useState(false) // 힌트 로딩 상태
@@ -38,6 +38,11 @@ function CodingTest() {
   const [activeHintTab, setActiveHintTab] = useState('request') // 'request' 또는 'history'
   const [hintHistory, setHintHistory] = useState([]) // 힌트 이력 저장
   const [expandedHintId, setExpandedHintId] = useState(null) // 펼쳐진 힌트 ID (아코디언)
+  // 힌트 방식(api/langgraph)은 관리자 설정에서 결정됨
+
+  // COH (Chain of Hint) 관련 상태
+  const [cohStatus, setCohStatus] = useState(null) // COH 상태 정보
+  const [blockedComponents, setBlockedComponents] = useState([]) // 차단된 구성요소
 
   // 리사이저 상태
   const [leftWidth, setLeftWidth] = useState(50) // 좌측 패널 너비 (%)
@@ -260,10 +265,12 @@ function CodingTest() {
         timestamp: h.timestamp
       }))
 
+      // 힌트 방식은 관리자 설정(백엔드)에서 결정됨 - 항상 기본 엔드포인트 호출
       const response = await api.post('/coding-test/hints/', {
         problem_id: problemId,
         user_code: code,
-        hint_config: hintConfig, // 커스텀 힌트 구성 전송
+        preset: hintConfig.preset, // 힌트 프리셋
+        custom_components: hintConfig.components, // 커스텀 구성 요소
         previous_hints: previousHints // Chain of Hints
       })
 
@@ -271,14 +278,29 @@ function CodingTest() {
         const newHint = response.data.data.hint
         setHint(newHint)
 
-        // 힌트 이력에 추가
+        // COH 상태 업데이트
+        if (response.data.data.coh_status) {
+          setCohStatus(response.data.data.coh_status)
+        }
+        if (response.data.data.blocked_components) {
+          setBlockedComponents(response.data.data.blocked_components)
+        }
+
+        // 힌트 이력에 추가 (COH 정보 포함)
         const newHintEntry = {
           id: Date.now(),
           timestamp: new Date().toISOString(),
           level: hintConfig.preset,
           config: { ...hintConfig },
           hint_text: newHint,
-          user_code_at_request: code
+          user_code_at_request: code,
+          method: response.data.data.method || 'api', // 서버에서 사용한 방식
+          hint_branch: response.data.data.hint_branch || null, // LangGraph 분기
+          // COH 관련 정보
+          coh_status: response.data.data.coh_status || null,
+          hint_level: response.data.data.hint_level || null,
+          coh_depth: response.data.data.coh_depth || 0,
+          blocked_components: response.data.data.blocked_components || []
         }
         setHintHistory(prev => [...prev, newHintEntry])
 
@@ -286,11 +308,13 @@ function CodingTest() {
         setActiveHintTab('history')
         setExpandedHintId(newHintEntry.id)
       } else {
-        setHint('힌트를 가져오는데 실패했습니다.')
+        const errorMsg = response.data.error || '힌트를 가져오는데 실패했습니다.'
+        setHint(`오류: ${errorMsg}`)
       }
     } catch (error) {
       console.error('Hint request error:', error)
-      setHint('힌트 요청 중 오류가 발생했습니다.')
+      const errorMsg = error.response?.data?.error || error.message || '힌트 요청 중 오류가 발생했습니다.'
+      setHint(`오류: ${errorMsg}`)
     } finally {
       setHintLoading(false)
     }
@@ -303,19 +327,46 @@ function CodingTest() {
     try {
       const response = await api.post('/coding-test/submit/', {
         problem_id: problemId,
-        code: code,
-        language: 'python'
+        code: code
       })
 
-      const result = response.data.data
-      if (result.passed) {
-        setOutput(`✅ 정답입니다!\n통과한 테스트: ${result.passed_tests}/${result.total_tests}`)
+      if (response.data.success) {
+        const { all_passed, passed_count, total_count, total_score, problem_status, test_results } = response.data
+
+        // 제출 결과 출력
+        let output = ''
+
+        if (all_passed) {
+          output += `✅ 모든 테스트 통과!\n`
+          output += `종합 점수: ${total_score}/100\n\n`
+
+          if (problem_status) {
+            output += `문제 상태: ${problem_status.status_display}\n`
+            output += `최고 점수: ${problem_status.best_score}/100\n\n`
+          }
+        } else {
+          output += `❌ 일부 테스트 실패\n`
+          output += `통과: ${passed_count}/${total_count}\n`
+          output += `종합 점수: ${total_score}/100\n\n`
+        }
+
+        // 테스트 결과 상세 (입출력 값은 숨김)
+        output += `=== 테스트 결과 ===\n`
+        test_results.forEach(test => {
+          const icon = test.passed ? '✅' : '❌'
+          output += `${icon} Test #${test.test_number}: ${test.description} - ${test.passed ? 'Pass' : 'Fail'}\n`
+          if (!test.passed && test.error) {
+            output += `   오류: ${test.error}\n`
+          }
+        })
+
+        setOutput(output)
       } else {
-        setOutput(`❌ 오답입니다.\n통과한 테스트: ${result.passed_tests}/${result.total_tests}\n\n${result.error || ''}`)
+        setOutput(`[제출 실패]\n${response.data.error || '알 수 없는 오류'}`)
       }
     } catch (error) {
       console.error('Submit error:', error)
-      setOutput(`[제출 오류]\n${error.response?.data?.message || error.message}`)
+      setOutput(`[제출 오류]\n${error.response?.data?.error || error.message}`)
     } finally {
       setLoading(false)
     }
@@ -453,7 +504,15 @@ function CodingTest() {
               defaultLanguage="python"
               theme="vs-dark"
               value={code}
-              onChange={(value) => setCode(value || '')}
+              onChange={(value) => {
+                const newCode = value || ''
+                setCode(newCode)
+                // 코드 변경 시 자동 저장 (사용자별, 문제별)
+                if (problemId && user) {
+                  const storageKey = `user_${user.id}_problem_${problemId}_code`
+                  localStorage.setItem(storageKey, newCode)
+                }
+              }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
@@ -490,22 +549,21 @@ function CodingTest() {
               {output || '코드를 실행하면 결과가 여기에 표시됩니다.'}
             </pre>
 
-            {/* 터미널 하단 우측 버튼 영역 */}
+            {/* 터미널 하단 액션 버튼 */}
             <div className="terminal-footer">
+              <button
+                className="terminal-action-btn hint-toggle-btn"
+                onClick={() => setShowHintModal(!showHintModal)}
+              >
+                💡 힌트
+              </button>
               <div className="terminal-actions">
-                <button
-                  className="terminal-action-btn hint-btn"
-                  onClick={() => setShowHintModal(true)}
-                  disabled={hintLoading}
-                >
-                  {hintLoading ? '힌트 생성 중...' : '💡 힌트'}
-                </button>
                 <button
                   className="terminal-action-btn run-btn"
                   onClick={handleRunCode}
                   disabled={loading}
                 >
-                  {loading ? '실행 중...' : '▶ 실행'}
+                  {loading ? '실행 중...' : '실행'}
                 </button>
                 <button
                   className="terminal-action-btn submit-btn"
@@ -520,14 +578,13 @@ function CodingTest() {
         </div>
       </div>
 
-      {/* 힌트 미니 모달 */}
+      {/* 힌트 팝업 */}
       {showHintModal && (
-        <div className="hint-modal-overlay" onClick={() => setShowHintModal(false)}>
-          <div className="hint-mini-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="hint-modal-header">
-              <h3>💡 힌트</h3>
-              <button className="hint-modal-close" onClick={() => setShowHintModal(false)}>×</button>
-            </div>
+        <div className="hint-popup">
+          <div className="hint-popup-header">
+            <h4>💡 힌트</h4>
+            <button className="hint-popup-close" onClick={() => setShowHintModal(false)}>×</button>
+          </div>
 
             {/* 탭 버튼 */}
             <div className="hint-modal-tabs">
@@ -549,45 +606,92 @@ function CodingTest() {
               {/* 힌트 요청 탭 */}
               {activeHintTab === 'request' && (
                 <>
+                  {/* COH 상태 표시 */}
+                  {cohStatus && (
+                    <div className="coh-status-section">
+                      <div className="coh-status-badge">
+                        <span className="coh-level-name">{cohStatus.level_name}</span>
+                        <span className="coh-hint-level">레벨 {cohStatus.hint_level}/9</span>
+                      </div>
+                      {cohStatus.can_get_more_detailed && (
+                        <p className="coh-hint-message">
+                          💡 {cohStatus.next_level_hint}
+                        </p>
+                      )}
+                      {!cohStatus.can_get_more_detailed && (
+                        <p className="coh-hint-message coh-max">
+                          ✨ 이미 가장 상세한 힌트 레벨입니다.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="hint-preset-section">
-                    <h4>프리셋 선택</h4>
+                    <h4>힌트 프리셋 (💡 요약 설명 방식만 변경됩니다)</h4>
                     <div className="preset-buttons">
                       <button
                         className={`preset-btn ${hintConfig.preset === '초급' ? 'active' : ''}`}
-                        onClick={() => setHintConfig({
-                          preset: '초급',
-                          components: {
-                            summary: true, libraries: true, code_example: true,
-                            step_by_step: false, complexity_hint: false,
-                            edge_cases: false, improvements: false
-                          }
-                        })}
+                        onClick={() => {
+                          // 초급 (레벨 4): 모든 구성요소 허용
+                          setHintConfig({
+                            preset: '초급',
+                            components: {
+                              summary: true,
+                              libraries: true,
+                              code_example: true,
+                              step_by_step: false,
+                              complexity_hint: false,
+                              edge_cases: false,
+                              improvements: false
+                            }
+                          })
+                          setCohStatus(null)
+                          setBlockedComponents([]) // 초급: 차단 없음
+                        }}
                       >
                         초급
                       </button>
                       <button
                         className={`preset-btn ${hintConfig.preset === '중급' ? 'active' : ''}`}
-                        onClick={() => setHintConfig({
-                          preset: '중급',
-                          components: {
-                            summary: true, libraries: true, code_example: false,
-                            step_by_step: false, complexity_hint: false,
-                            edge_cases: false, improvements: false
-                          }
-                        })}
+                        onClick={() => {
+                          // 중급 (레벨 7): code_example, step_by_step 차단 (libraries는 허용)
+                          setHintConfig({
+                            preset: '중급',
+                            components: {
+                              summary: true,
+                              libraries: true,
+                              code_example: false,
+                              step_by_step: false,
+                              complexity_hint: true,
+                              edge_cases: false,
+                              improvements: false
+                            }
+                          })
+                          setCohStatus(null)
+                          setBlockedComponents(['code_example', 'step_by_step'])
+                        }}
                       >
                         중급
                       </button>
                       <button
                         className={`preset-btn ${hintConfig.preset === '고급' ? 'active' : ''}`}
-                        onClick={() => setHintConfig({
-                          preset: '고급',
-                          components: {
-                            summary: true, libraries: false, code_example: false,
-                            step_by_step: false, complexity_hint: false,
-                            edge_cases: false, improvements: false
-                          }
-                        })}
+                        onClick={() => {
+                          // 고급 (레벨 9): libraries, code_example, step_by_step 차단
+                          setHintConfig({
+                            preset: '고급',
+                            components: {
+                              summary: true,
+                              libraries: false,
+                              code_example: false,
+                              step_by_step: false,
+                              complexity_hint: true,
+                              edge_cases: true,
+                              improvements: true
+                            }
+                          })
+                          setCohStatus(null)
+                          setBlockedComponents(['libraries', 'code_example', 'step_by_step'])
+                        }}
                       >
                         고급
                       </button>
@@ -595,35 +699,42 @@ function CodingTest() {
                   </div>
 
                   <div className="hint-custom-section">
-                    <h4>커스텀 구성</h4>
+                    <h4>힌트 구성 요소 (💡 요약은 항상 포함됩니다)</h4>
                     <div className="hint-options">
                       {[
-                        { key: 'summary', label: '요약' },
-                        { key: 'libraries', label: '라이브러리' },
-                        { key: 'code_example', label: '코드 예시' },
-                        { key: 'step_by_step', label: '단계별 방법' },
-                        { key: 'complexity_hint', label: '복잡도 힌트' },
-                        { key: 'edge_cases', label: '엣지 케이스' },
-                        { key: 'improvements', label: '개선 사항' }
-                      ].map(({ key, label }) => (
-                        <div key={key} className="hint-option">
-                          <input
-                            type="checkbox"
-                            id={`hint-${key}`}
-                            checked={hintConfig.components[key]}
-                            onChange={(e) => {
-                              setHintConfig({
-                                preset: null,
-                                components: {
-                                  ...hintConfig.components,
-                                  [key]: e.target.checked
-                                }
-                              })
-                            }}
-                          />
-                          <label htmlFor={`hint-${key}`}>{label}</label>
-                        </div>
-                      ))}
+                        // 순서: 차단되는 것들을 위에 배치 (위에서부터 차단됨)
+                        { key: 'code_example', label: '코드 예시' },      // 중급/고급 차단
+                        { key: 'step_by_step', label: '단계별 방법' },    // 중급/고급 차단
+                        { key: 'libraries', label: '라이브러리' },        // 고급에서만 차단
+                        { key: 'complexity_hint', label: '복잡도 힌트' }, // 항상 허용
+                        { key: 'edge_cases', label: '엣지 케이스' },      // 항상 허용
+                        { key: 'improvements', label: '개선 사항' }       // 항상 허용
+                      ].map(({ key, label }) => {
+                        const isBlocked = blockedComponents.includes(key)
+                        return (
+                          <div key={key} className={`hint-option ${isBlocked ? 'blocked' : ''}`}>
+                            <input
+                              type="checkbox"
+                              id={`hint-${key}`}
+                              checked={hintConfig.components[key]}
+                              disabled={isBlocked}
+                              onChange={(e) => {
+                                setHintConfig(prev => ({
+                                  ...prev,
+                                  components: {
+                                    ...prev.components,
+                                    [key]: e.target.checked
+                                  }
+                                }))
+                              }}
+                            />
+                            <label htmlFor={`hint-${key}`}>
+                              {label}
+                              {isBlocked && <span className="blocked-icon">🔒</span>}
+                            </label>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </>
@@ -650,8 +761,13 @@ function CodingTest() {
                                 힌트 {hintHistory.length - index}
                               </span>
                               <span className="hint-history-level">
-                                {historyItem.level || '커스텀'}
+                                {historyItem.coh_status?.level_name || historyItem.level || '커스텀'}
                               </span>
+                              {historyItem.hint_level && (
+                                <span className="hint-history-coh-level">
+                                  Lv.{historyItem.hint_level}
+                                </span>
+                              )}
                               <span className="hint-history-time">
                                 {new Date(historyItem.timestamp).toLocaleString('ko-KR', {
                                   month: 'short',
@@ -666,6 +782,24 @@ function CodingTest() {
                             </div>
                             {isExpanded && (
                               <div className="hint-history-content">
+                                {/* COH 정보 표시 */}
+                                {historyItem.coh_status && (
+                                  <div className="hint-history-coh-info">
+                                    <span className="coh-badge">
+                                      {historyItem.coh_status.level_name}
+                                    </span>
+                                    <span className="coh-detail">
+                                      레벨 {historyItem.hint_level}/9
+                                      {historyItem.coh_depth > 0 && ` (COH ${historyItem.coh_depth})`}
+                                    </span>
+                                    {/* summary 외의 차단된 구성요소만 표시 */}
+                                    {historyItem.blocked_components?.filter(c => c !== 'summary').length > 0 && (
+                                      <span className="coh-blocked">
+                                        🔒 차단됨: {historyItem.blocked_components.filter(c => c !== 'summary').join(', ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                                 {historyItem.hint_text}
                               </div>
                             )}
@@ -678,32 +812,16 @@ function CodingTest() {
               )}
             </div>
 
-            <div className="hint-modal-footer">
-              <button className="hint-close-btn" onClick={() => setShowHintModal(false)}>
-                닫기
+          <div className="hint-popup-footer">
+            {activeHintTab === 'request' && (
+              <button
+                className="hint-request-btn"
+                onClick={handleRequestHint}
+                disabled={hintLoading}
+              >
+                {hintLoading ? '힌트 생성 중...' : '💡 힌트 요청'}
               </button>
-              {activeHintTab === 'request' && (
-                <div className="hint-action-buttons">
-                  <button
-                    className="hint-request-btn"
-                    onClick={handleRequestHint}
-                    disabled={hintLoading}
-                  >
-                    {hintLoading ? '힌트 생성 중...' : '💡 힌트 요청'}
-                  </button>
-                  <button
-                    className="solution-btn"
-                    onClick={() => {
-                      if (window.confirm('정답을 확인하시겠습니까? 학습 효과가 떨어질 수 있습니다.')) {
-                        alert('정답 보기 기능은 준비 중입니다.')
-                      }
-                    }}
-                  >
-                    ✅ 정답 보기
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}

@@ -6,15 +6,16 @@ import ast
 import json
 import os
 import tempfile
+import time
+import tracemalloc
 from pathlib import Path
-from radon.complexity import cc_visit
 from radon.metrics import mi_visit
 import pycodestyle
 
 
 def load_problem_json():
     """문제 JSON 파일 로드"""
-    json_path = Path(__file__).parent / 'data' / 'problems_final_cleaned.json'
+    json_path = Path(__file__).parent / 'data' / 'problems_final_output.json'
     with open(json_path, 'r', encoding='utf-8-sig') as f:
         return json.load(f)
 
@@ -35,30 +36,74 @@ def check_syntax_errors(code):
         return 1
 
 
-def calculate_complexity(user_code):
+def measure_execution_time(user_code, execution_results):
     """
-    코드 복잡도 계산 (Cyclomatic Complexity)
+    코드 실행 시간 측정 (밀리초)
 
     Args:
         user_code: 사용자 코드
+        execution_results: 테스트 케이스 실행 결과 리스트
 
     Returns:
-        int: 평균 복잡도 (1-50+)
+        float: 평균 실행 시간 (ms)
     """
     if not user_code or not user_code.strip():
-        return 0
+        return 0.0
+
+    if not execution_results:
+        return 0.0
 
     try:
-        complexity_results = cc_visit(user_code)
-        if not complexity_results:
-            return 1
+        # execution_results에서 실행 시간 추출
+        execution_times = []
+        for result in execution_results:
+            exec_time = result.get('execution_time', 0)
+            if exec_time > 0:
+                execution_times.append(exec_time * 1000)  # 초를 밀리초로 변환
 
-        # 모든 함수/메서드의 평균 복잡도 계산
-        total_complexity = sum(result.complexity for result in complexity_results)
-        avg_complexity = total_complexity / len(complexity_results)
-        return round(avg_complexity, 1)
+        if not execution_times:
+            return 0.0
+
+        # 평균 실행 시간 계산
+        avg_time = sum(execution_times) / len(execution_times)
+        return round(avg_time, 2)
     except:
-        return 0
+        return 0.0
+
+
+def measure_memory_usage(user_code, execution_results):
+    """
+    메모리 사용량 측정 (KB)
+
+    Args:
+        user_code: 사용자 코드
+        execution_results: 테스트 케이스 실행 결과 리스트
+
+    Returns:
+        float: 평균 메모리 사용량 (KB)
+    """
+    if not user_code or not user_code.strip():
+        return 0.0
+
+    if not execution_results:
+        return 0.0
+
+    try:
+        # execution_results에서 메모리 사용량 추출
+        memory_usages = []
+        for result in execution_results:
+            memory = result.get('memory_usage', 0)
+            if memory > 0:
+                memory_usages.append(memory / 1024)  # 바이트를 KB로 변환
+
+        if not memory_usages:
+            return 0.0
+
+        # 평균 메모리 사용량 계산
+        avg_memory = sum(memory_usages) / len(memory_usages)
+        return round(avg_memory, 2)
+    except:
+        return 0.0
 
 
 def calculate_quality_score(user_code):
@@ -85,53 +130,6 @@ def calculate_quality_score(user_code):
         return 0.0
 
 
-def calculate_algorithm_pattern_match(user_code, logic_steps):
-    """
-    알고리즘 패턴 일치도 계산
-
-    Args:
-        user_code: 사용자 코드
-        logic_steps: 문제의 logic_steps 리스트
-
-    Returns:
-        float: 0-100 사이의 패턴 일치도
-    """
-    if not user_code or not user_code.strip():
-        return 0.0
-
-    if not logic_steps:
-        # logic_steps가 없으면 기본 패턴 체크
-        has_input = 'input(' in user_code
-        has_output = 'print(' in user_code
-        return 50.0 if (has_input and has_output) else 25.0
-
-    # 알고리즘 패턴 키워드 체크
-    pattern_keywords = {
-        'loop': ['for ', 'while '],
-        'condition': ['if ', 'elif ', 'else:'],
-        'data_structure': ['list', 'dict', 'set', 'tuple'],
-        'string_manipulation': ['.split(', '.join(', '.strip(', '.replace('],
-        'math_operations': ['sum(', 'max(', 'min(', 'abs(', '**'],
-        'comprehension': ['[' and 'for' and 'in', '{' and 'for' and 'in']
-    }
-
-    matched_patterns = 0
-    total_patterns = 0
-
-    for step in logic_steps:
-        code_pattern = step.get('code_pattern', '').lower()
-
-        for pattern_type, keywords in pattern_keywords.items():
-            if any(kw in code_pattern for kw in keywords):
-                total_patterns += 1
-                if any(kw in user_code.lower() for kw in keywords):
-                    matched_patterns += 1
-                break
-
-    if total_patterns == 0:
-        return 50.0
-
-    return round((matched_patterns / total_patterns) * 100, 2)
 
 
 def count_pep8_violations(user_code):
@@ -222,12 +220,12 @@ def analyze_code(user_code, problem_id, execution_results=None):
         dict: 6가지 정적 지표
             - syntax_errors: 문법 오류 개수
             - test_pass_rate: 테스트 통과율 (0-100%)
-            - code_complexity: 코드 복잡도 (1-50+)
+            - execution_time: 실행 시간 (ms)
+            - memory_usage: 메모리 사용량 (KB)
             - code_quality_score: 코드 품질 점수 (0-100)
-            - algorithm_pattern_match: 알고리즘 패턴 일치도 (0-100%)
             - pep8_violations: PEP8 위반 개수
     """
-    # 문제 JSON 로드
+    # 문제 JSON 로드 (필요한 경우)
     problems_data = load_problem_json()
     problem_data = next((p for p in problems_data if p['problem_id'] == str(problem_id)), None)
 
@@ -236,16 +234,11 @@ def analyze_code(user_code, problem_id, execution_results=None):
         return {
             'syntax_errors': 0,
             'test_pass_rate': 0.0,
-            'code_complexity': 0,
+            'execution_time': 0.0,
+            'memory_usage': 0.0,
             'code_quality_score': 0.0,
-            'algorithm_pattern_match': 0.0,
             'pep8_violations': 0
         }
-
-    # 첫 번째 솔루션의 logic_steps 사용
-    logic_steps = []
-    if problem_data.get('solutions') and len(problem_data['solutions']) > 0:
-        logic_steps = problem_data['solutions'][0].get('logic_steps', [])
 
     # 1. 문법 오류
     syntax_errors = check_syntax_errors(user_code)
@@ -253,14 +246,14 @@ def analyze_code(user_code, problem_id, execution_results=None):
     # 2. 테스트 통과율
     test_pass_rate = calculate_test_pass_rate(execution_results) if execution_results else 0.0
 
-    # 3. 코드 복잡도
-    code_complexity = calculate_complexity(user_code)
+    # 3. 실행 시간 (ms)
+    execution_time = measure_execution_time(user_code, execution_results) if execution_results else 0.0
 
-    # 4. 코드 품질 점수
+    # 4. 메모리 사용량 (KB)
+    memory_usage = measure_memory_usage(user_code, execution_results) if execution_results else 0.0
+
+    # 5. 코드 품질 점수
     code_quality_score = calculate_quality_score(user_code)
-
-    # 5. 알고리즘 패턴 일치도
-    algorithm_pattern_match = calculate_algorithm_pattern_match(user_code, logic_steps)
 
     # 6. PEP8 위반 개수
     pep8_violations = count_pep8_violations(user_code)
@@ -268,10 +261,120 @@ def analyze_code(user_code, problem_id, execution_results=None):
     return {
         'syntax_errors': syntax_errors,
         'test_pass_rate': test_pass_rate,
-        'code_complexity': code_complexity,
+        'execution_time': execution_time,
+        'memory_usage': memory_usage,
         'code_quality_score': code_quality_score,
-        'algorithm_pattern_match': algorithm_pattern_match,
         'pep8_violations': pep8_violations
+    }
+
+
+def detect_complexity_patterns(user_code):
+    """
+    코드에서 복잡도와 관련된 패턴을 검사합니다.
+
+    Returns:
+        dict: 검사 결과
+            - has_nested_loops: 중첩 반복문 여부
+            - nested_loop_depth: 중첩 깊이 (최대)
+            - has_recursive_calls: 재귀 호출 여부
+            - complexity_hints: LLM에게 제공할 컨텍스트 리스트
+    """
+    import ast
+    import re
+
+    complexity_hints = []
+    has_nested_loops = False
+    nested_loop_depth = 0
+    has_recursive_calls = False
+
+    if not user_code or not user_code.strip():
+        return {
+            'has_nested_loops': False,
+            'nested_loop_depth': 0,
+            'has_recursive_calls': False,
+            'complexity_hints': []
+        }
+
+    try:
+        # AST 파싱
+        tree = ast.parse(user_code)
+
+        # 중첩 반복문 검사
+        class LoopAnalyzer(ast.NodeVisitor):
+            def __init__(self):
+                self.max_depth = 0
+                self.current_depth = 0
+
+            def visit_For(self, node):
+                self.current_depth += 1
+                self.max_depth = max(self.max_depth, self.current_depth)
+                self.generic_visit(node)
+                self.current_depth -= 1
+
+            def visit_While(self, node):
+                self.current_depth += 1
+                self.max_depth = max(self.max_depth, self.current_depth)
+                self.generic_visit(node)
+                self.current_depth -= 1
+
+        loop_analyzer = LoopAnalyzer()
+        loop_analyzer.visit(tree)
+        nested_loop_depth = loop_analyzer.max_depth
+        has_nested_loops = nested_loop_depth >= 2
+
+        if nested_loop_depth >= 3:
+            complexity_hints.append(f"중첩 반복문 {nested_loop_depth}중 발견 → O(n^{nested_loop_depth}) 의심")
+        elif nested_loop_depth == 2:
+            complexity_hints.append("중첩 반복문 2중 발견 → O(n²) 의심")
+
+        # 재귀 호출 검사 (함수 내에서 자기 자신을 호출하는지)
+        class RecursionAnalyzer(ast.NodeVisitor):
+            def __init__(self):
+                self.has_recursion = False
+                self.function_names = set()
+                self.current_function = None
+
+            def visit_FunctionDef(self, node):
+                self.function_names.add(node.name)
+                prev_function = self.current_function
+                self.current_function = node.name
+                self.generic_visit(node)
+                self.current_function = prev_function
+
+            def visit_Call(self, node):
+                if isinstance(node.func, ast.Name):
+                    if self.current_function and node.func.id == self.current_function:
+                        self.has_recursion = True
+                self.generic_visit(node)
+
+        recursion_analyzer = RecursionAnalyzer()
+        recursion_analyzer.visit(tree)
+        has_recursive_calls = recursion_analyzer.has_recursion
+
+        if has_recursive_calls:
+            complexity_hints.append("재귀 함수 사용 발견 → 깊이/분기에 따른 복잡도 분석 필요")
+
+        # 특정 비효율적 패턴 검사 (정규식)
+        # 1. 리스트 내포문 내 반복문
+        if re.search(r'\[.*for.*for.*\]', user_code):
+            complexity_hints.append("리스트 내포문 내 중첩 반복 발견")
+
+        # 2. 반복문 내 리스트 확장 (append in loop)
+        if re.search(r'for\s+.*:\s*\n.*\.append\(', user_code, re.MULTILINE):
+            complexity_hints.append("반복문 내 append 사용 (리스트 내포문 고려 가능)")
+
+    except SyntaxError:
+        # 문법 오류가 있으면 패턴 검사 불가
+        complexity_hints.append("문법 오류로 인해 복잡도 패턴 분석 불가")
+    except Exception as e:
+        # 기타 오류
+        complexity_hints.append(f"패턴 분석 중 오류: {str(e)}")
+
+    return {
+        'has_nested_loops': has_nested_loops,
+        'nested_loop_depth': nested_loop_depth,
+        'has_recursive_calls': has_recursive_calls,
+        'complexity_hints': complexity_hints
     }
 
 
@@ -301,10 +404,10 @@ def evaluate_code_with_llm(user_code, problem_description, static_metrics):
             return {
                 'algorithm_efficiency': 3,
                 'code_readability': 3,
-                'design_pattern_fit': 3,
                 'edge_case_handling': 3,
                 'code_conciseness': 3,
-                'function_separation': 3
+                'test_coverage_estimate': 3,
+                'security_awareness': 3
             }
 
         api_key = ai_config.api_key if ai_config.api_key else os.environ.get('HUGGINGFACE_API_KEY', '')
@@ -312,11 +415,19 @@ def evaluate_code_with_llm(user_code, problem_description, static_metrics):
             return {
                 'algorithm_efficiency': 3,
                 'code_readability': 3,
-                'design_pattern_fit': 3,
                 'edge_case_handling': 3,
                 'code_conciseness': 3,
-                'function_separation': 3
+                'test_coverage_estimate': 3,
+                'security_awareness': 3
             }
+
+        # 복잡도 패턴 검사
+        complexity_patterns = detect_complexity_patterns(user_code)
+        complexity_context = ""
+        if complexity_patterns['complexity_hints']:
+            complexity_context = "\n# 복잡도 패턴 분석\n"
+            for hint in complexity_patterns['complexity_hints']:
+                complexity_context += f"- {hint}\n"
 
         # LLM 평가 프롬프트
         prompt = f"""당신은 Python 코드 평가 전문가입니다.
@@ -330,28 +441,31 @@ def evaluate_code_with_llm(user_code, problem_description, static_metrics):
 # 정적 분석 결과
 - 문법 오류: {static_metrics['syntax_errors']}개
 - 테스트 통과율: {static_metrics['test_pass_rate']}%
-- 코드 복잡도: {static_metrics['code_complexity']}
+- 실행 시간: {static_metrics['execution_time']}ms
+- 메모리 사용량: {static_metrics['memory_usage']}KB
 - 코드 품질: {static_metrics['code_quality_score']}/100
-- 알고리즘 패턴 일치도: {static_metrics['algorithm_pattern_match']}%
 - PEP8 위반: {static_metrics['pep8_violations']}개
-
+{complexity_context}
 아래 6가지 기준으로 코드를 평가하세요 (각 1-5점):
 
-1. algorithm_efficiency: 시간/공간 복잡도 최적화
+1. algorithm_efficiency: 시간/공간 복잡도 최적화 수준
+   - 위 복잡도 패턴 분석을 참고하세요
+   - 중첩 반복문이 있다면 더 효율적인 알고리즘(해시맵, 정렬 등)이 가능한지 평가하세요
+   - 재귀 함수가 있다면 메모이제이션이나 DP로 개선 가능한지 평가하세요
 2. code_readability: 변수명, 주석, 구조의 명확성
-3. design_pattern_fit: 적절한 알고리즘 패턴과 자료구조 선택
-4. edge_case_handling: 경계 조건과 예외 처리
-5. code_conciseness: 중복 제거, DRY 원칙 준수
-6. function_separation: 모듈화, 단일 책임 원칙
+3. edge_case_handling: 경계 조건과 예외 처리
+4. code_conciseness: 중복 제거, DRY 원칙 준수
+5. test_coverage_estimate: 테스트 케이스 커버리지 추정
+6. security_awareness: 보안 취약점 인식 및 안전한 코딩
 
 JSON 형식으로만 응답:
 {{
   "algorithm_efficiency": 1-5,
   "code_readability": 1-5,
-  "design_pattern_fit": 1-5,
   "edge_case_handling": 1-5,
   "code_conciseness": 1-5,
-  "function_separation": 1-5
+  "test_coverage_estimate": 1-5,
+  "security_awareness": 1-5
 }}"""
 
         headers = {
@@ -386,10 +500,10 @@ JSON 형식으로만 응답:
                     return {
                         'algorithm_efficiency': llm_data.get('algorithm_efficiency', 3),
                         'code_readability': llm_data.get('code_readability', 3),
-                        'design_pattern_fit': llm_data.get('design_pattern_fit', 3),
                         'edge_case_handling': llm_data.get('edge_case_handling', 3),
                         'code_conciseness': llm_data.get('code_conciseness', 3),
-                        'function_separation': llm_data.get('function_separation', 3)
+                        'test_coverage_estimate': llm_data.get('test_coverage_estimate', 3),
+                        'security_awareness': llm_data.get('security_awareness', 3)
                     }
                 except json.JSONDecodeError:
                     pass
@@ -401,8 +515,8 @@ JSON 형식으로만 응답:
     return {
         'algorithm_efficiency': 3,
         'code_readability': 3,
-        'design_pattern_fit': 3,
         'edge_case_handling': 3,
         'code_conciseness': 3,
-        'function_separation': 3
+        'test_coverage_estimate': 3,
+        'security_awareness': 3
     }
