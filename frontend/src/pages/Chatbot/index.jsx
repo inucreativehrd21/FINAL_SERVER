@@ -158,6 +158,13 @@ function Chatbot() {
     }
   }
 
+  // 답변 본문에서 "📚 참고:" 섹션 제거하는 함수
+  const cleanAnswerContent = (content) => {
+    // "📚 참고:" 또는 "📚참고:" 이전 내용만 추출
+    const parts = content.split(/📚\s*참고[:：]\s*/i)
+    return parts[0].trim()
+  }
+
   return (
     <div className="chatbot-page">
       <div className="chat-section">
@@ -187,7 +194,12 @@ function Chatbot() {
                 {message.role === 'user' ? '👤' : '🤖'}
               </div>
               <div className="message-content">
-                <div className="message-text">{message.content}</div>
+                <div className="message-text" style={{ whiteSpace: 'pre-wrap' }}>
+                  {message.role === 'assistant'
+                    ? cleanAnswerContent(message.content)
+                    : message.content
+                  }
+                </div>
 
                 {/* Sources 렌더링 (객체 타입 안전 처리 + URL 링크) */}
                 {message.sources && message.sources.length > 0 && (
