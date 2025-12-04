@@ -8,6 +8,8 @@ import UsersTab from './tabs/UsersTab'
 import ProblemsTab from './tabs/ProblemsTab'
 import TestCasesTab from './tabs/TestCasesTab'
 import SolutionsTab from './tabs/SolutionsTab'
+import MetricsValidationTab from './tabs/MetricsValidationTab'
+import ProblemDataValidationTab from './tabs/ProblemDataValidationTab'
 
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState('models')
@@ -36,6 +38,14 @@ function AdminPanel() {
   const [modelName, setModelName] = useState('Qwen/Qwen2.5-Coder-7B-Instruct')
   const [isModelLoaded, setIsModelLoaded] = useState(false)
   const [aiConfigLoading, setAiConfigLoading] = useState(false)
+
+  // Runpod 관련 상태
+  const [runpodEndpoint, setRunpodEndpoint] = useState('')
+  const [runpodApiKey, setRunpodApiKey] = useState('')
+
+  // 힌트 엔진 및 OpenAI 관련 상태
+  const [hintEngine, setHintEngine] = useState('api')
+  const [openaiApiKey, setOpenaiApiKey] = useState('')
 
   useEffect(() => {
     fetchCurrentUser()
@@ -155,6 +165,10 @@ function AdminPanel() {
         setApiKey(config.api_key || '')
         setModelName(config.model_name)
         setIsModelLoaded(config.is_model_loaded)
+        setRunpodEndpoint(config.runpod_endpoint || '')
+        setRunpodApiKey(config.runpod_api_key || '')
+        setHintEngine(config.hint_engine || 'api')
+        setOpenaiApiKey(config.openai_api_key || '')
       }
     } catch (error) {
       console.error('Failed to fetch AI config:', error)
@@ -167,7 +181,11 @@ function AdminPanel() {
       const response = await api.post('/coding-test/ai-config/update/', {
         mode: aiMode,
         api_key: apiKey,
-        model_name: modelName
+        model_name: modelName,
+        runpod_endpoint: runpodEndpoint,
+        runpod_api_key: runpodApiKey,
+        hint_engine: hintEngine,
+        openai_api_key: openaiApiKey
       })
 
       if (response.data.success) {
@@ -687,6 +705,18 @@ function AdminPanel() {
                 </span>
               )}
             </button>
+            <button
+              className={activeTab === 'metrics' ? 'active' : ''}
+              onClick={() => setActiveTab('metrics')}
+            >
+              📊 메트릭 검증
+            </button>
+            <button
+              className={activeTab === 'problem-data' ? 'active' : ''}
+              onClick={() => setActiveTab('problem-data')}
+            >
+              📝 문제 데이터 검증
+            </button>
           </div>
 
           <div className="admin-content">
@@ -700,6 +730,14 @@ function AdminPanel() {
             setModelName={setModelName}
             isModelLoaded={isModelLoaded}
             aiConfigLoading={aiConfigLoading}
+            runpodEndpoint={runpodEndpoint}
+            setRunpodEndpoint={setRunpodEndpoint}
+            runpodApiKey={runpodApiKey}
+            setRunpodApiKey={setRunpodApiKey}
+            hintEngine={hintEngine}
+            setHintEngine={setHintEngine}
+            openaiApiKey={openaiApiKey}
+            setOpenaiApiKey={setOpenaiApiKey}
             handleUpdateAIConfig={handleUpdateAIConfig}
             handleLoadModel={handleLoadModel}
             handleUnloadModel={handleUnloadModel}
@@ -768,6 +806,14 @@ function AdminPanel() {
             handleApproveSolution={handleApproveSolution}
             handleRejectSolution={handleRejectSolution}
           />
+        )}
+
+        {activeTab === 'metrics' && (
+          <MetricsValidationTab />
+        )}
+
+        {activeTab === 'problem-data' && (
+          <ProblemDataValidationTab />
         )}
           </div>
         </div>

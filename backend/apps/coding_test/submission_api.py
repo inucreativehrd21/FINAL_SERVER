@@ -72,6 +72,34 @@ def calculate_total_score(static_metrics, llm_metrics):
     return round(total_score, 2)
 
 
+def calculate_star_count(all_passed, code_quality_score, static_metrics, llm_metrics):
+    """
+    12개 지표를 기반으로 별점 계산 (힌트 로직과 동일)
+
+    Args:
+        all_passed: 모든 테스트 통과 여부
+        code_quality_score: 코드 품질 점수 (0-100)
+        static_metrics: 정적 지표 6개
+        llm_metrics: LLM 지표 6개
+
+    Returns:
+        int: 별점 (0-3)
+    """
+    # 테스트 미통과 시 0점
+    if not all_passed:
+        return 0
+
+    # 테스트 통과 시 최소 1개
+    # 코드 품질 70점 이상: 2개
+    # 코드 품질 90점 이상: 3개
+    if code_quality_score >= 90:
+        return 3
+    elif code_quality_score >= 70:
+        return 2
+    else:
+        return 1
+
+
 def determine_problem_status(all_passed, total_score):
     """
     문제 상태 결정
@@ -248,6 +276,10 @@ def submit_code(request):
     total_count = len(hidden_test_cases)
     total_score = round((passed_count / total_count) * 100) if total_count > 0 else 0
 
+    # 별점 계산 (12개 지표 기반 - 힌트 로직과 동일)
+    code_quality = static_metrics.get('code_quality_score', 0)
+    star_count = calculate_star_count(all_passed, code_quality, static_metrics, llm_metrics)
+
     # DB에 제출 기록 저장
     try:
         problem_obj, _ = Problem.objects.get_or_create(
@@ -288,7 +320,7 @@ def submit_code(request):
             security_awareness=llm_metrics.get('security_awareness', 3)
         )
 
-        print(f'[Submission] User: {request.user.username}, Problem: {problem_id}, Passed: {passed_count}/{len(hidden_test_cases)}, Score: {total_score}')
+        print(f'[Submission] User: {request.user.username}, Problem: {problem_id}, Passed: {passed_count}/{len(hidden_test_cases)}, Score: {total_score}, Stars: {star_count}')
 
         # 문제 상태 업데이트 (정답일 때만)
         new_status = determine_problem_status(all_passed, total_score)
@@ -299,6 +331,7 @@ def submit_code(request):
                 defaults={
                     'status': new_status,
                     'best_score': total_score,
+                    'star_count': star_count,
                     'first_solved_at': timezone.now()
                 }
             )
@@ -310,6 +343,11 @@ def submit_code(request):
                 # 점수 갱신 (더 높은 점수로만)
                 if total_score > problem_status.best_score:
                     problem_status.best_score = total_score
+
+                # 별점 갱신 (더 높은 별점으로만)
+                if star_count > (problem_status.star_count or 0):
+                    problem_status.star_count = star_count
+                    print(f'[Star] {problem_id}: {problem_status.star_count - star_count if problem_status.star_count else 0} → {star_count}개')
 
                 # 상태 전환 로직
                 if old_status == 'upgrade':
@@ -356,7 +394,8 @@ def submit_code(request):
             current_status = {
                 'status': problem_status.status,
                 'status_display': problem_status.get_status_display(),
-                'best_score': problem_status.best_score
+                'best_score': problem_status.best_score,
+                'star_count': problem_status.star_count or 0
             }
     except:
         pass
@@ -368,6 +407,7 @@ def submit_code(request):
         'passed_count': passed_count,
         'total_count': len(hidden_test_cases),
         'total_score': total_score,
+        'star_count': star_count,
         'problem_status': current_status,
         'metrics': {
             'static': static_metrics,

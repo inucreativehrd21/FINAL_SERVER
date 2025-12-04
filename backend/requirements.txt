@@ -44,3 +44,4 @@ whitenoise==6.6.0
 # Code Analysis
 radon==6.0.1
 pycodestyle==2.11.1
+openai==1.12.0

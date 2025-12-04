@@ -331,23 +331,31 @@ function CodingTest() {
       })
 
       if (response.data.success) {
-        const { all_passed, passed_count, total_count, total_score, problem_status, test_results } = response.data
+        const { all_passed, passed_count, total_count, total_score, star_count, problem_status, test_results } = response.data
+
+        // 별점 표시 함수
+        const renderStars = (count) => {
+          return '⭐'.repeat(count) + '☆'.repeat(3 - count)
+        }
 
         // 제출 결과 출력
         let output = ''
 
         if (all_passed) {
           output += `✅ 모든 테스트 통과!\n`
+          output += `별점: ${renderStars(star_count)} (${star_count}/3)\n`
           output += `종합 점수: ${total_score}/100\n\n`
 
           if (problem_status) {
             output += `문제 상태: ${problem_status.status_display}\n`
-            output += `최고 점수: ${problem_status.best_score}/100\n\n`
+            output += `최고 점수: ${problem_status.best_score}/100\n`
+            output += `최고 별점: ${renderStars(problem_status.star_count)} (${problem_status.star_count}/3)\n\n`
           }
         } else {
           output += `❌ 일부 테스트 실패\n`
           output += `통과: ${passed_count}/${total_count}\n`
-          output += `종합 점수: ${total_score}/100\n\n`
+          output += `종합 점수: ${total_score}/100\n`
+          output += `별점: ${renderStars(0)} (테스트 통과 시 부여)\n\n`
         }
 
         // 테스트 결과 상세 (입출력 값은 숨김)

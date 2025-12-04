@@ -18,9 +18,13 @@ def get_ai_config(request):
         'success': True,
         'data': {
             'mode': config.mode,
+            'hint_engine': getattr(config, 'hint_engine', 'api'),
             'api_key': config.api_key if config.api_key else '',
+            'openai_api_key': getattr(config, 'openai_api_key', '') or '',
             'model_name': config.model_name,
             'is_model_loaded': config.is_model_loaded,
+            'runpod_endpoint': config.runpod_endpoint if config.runpod_endpoint else '',
+            'runpod_api_key': config.runpod_api_key if config.runpod_api_key else '',
             'updated_at': config.updated_at
         }
     })
@@ -33,13 +37,23 @@ def update_ai_config(request):
     config = AIModelConfig.get_config()
 
     mode = request.data.get('mode')
+    hint_engine = request.data.get('hint_engine')
     api_key = request.data.get('api_key')
+    openai_api_key = request.data.get('openai_api_key')
     model_name = request.data.get('model_name')
+    runpod_endpoint = request.data.get('runpod_endpoint')
+    runpod_api_key = request.data.get('runpod_api_key')
 
-    if mode and mode not in ['api', 'local']:
+    if mode and mode not in ['api', 'openai', 'local', 'runpod']:
         return Response({
             'success': False,
             'message': '올바르지 않은 모드입니다.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    if hint_engine and hint_engine not in ['api', 'langgraph']:
+        return Response({
+            'success': False,
+            'message': '올바르지 않은 힌트 엔진입니다.'
         }, status=status.HTTP_400_BAD_REQUEST)
 
     # 모드 변경
@@ -48,19 +62,35 @@ def update_ai_config(request):
         config.mode = mode
 
         # 로컬 모드에서 API 모드로 변경 시 모델 언로드
-        if old_mode == 'local' and mode == 'api':
+        if old_mode == 'local' and mode in ['api', 'openai']:
             config.is_model_loaded = False
             # TODO: 실제 모델 언로드 로직
 
-    # API 키 업데이트
+    # 힌트 엔진 변경
+    if hint_engine:
+        config.hint_engine = hint_engine
+
+    # HuggingFace API 키 업데이트
     if api_key is not None:
         config.api_key = api_key
         # .env 파일 업데이트
         update_env_file('HUGGINGFACE_API_KEY', api_key)
 
+    # OpenAI API 키 업데이트
+    if openai_api_key is not None:
+        config.openai_api_key = openai_api_key
+        update_env_file('OPENAI_API_KEY', openai_api_key)
+
     # 모델 이름 업데이트
     if model_name:
         config.model_name = model_name
+
+    # Runpod 설정 업데이트
+    if runpod_endpoint is not None:
+        config.runpod_endpoint = runpod_endpoint
+
+    if runpod_api_key is not None:
+        config.runpod_api_key = runpod_api_key
 
     config.save()
 
@@ -69,9 +99,13 @@ def update_ai_config(request):
         'message': 'AI 모델 설정이 업데이트되었습니다.',
         'data': {
             'mode': config.mode,
+            'hint_engine': getattr(config, 'hint_engine', 'api'),
             'api_key': config.api_key if config.api_key else '',
+            'openai_api_key': getattr(config, 'openai_api_key', '') or '',
             'model_name': config.model_name,
-            'is_model_loaded': config.is_model_loaded
+            'is_model_loaded': config.is_model_loaded,
+            'runpod_endpoint': config.runpod_endpoint if config.runpod_endpoint else '',
+            'runpod_api_key': config.runpod_api_key if config.runpod_api_key else ''
         }
     })
 

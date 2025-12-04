@@ -59,13 +59,13 @@ def submit_survey(request):
 
 def generate_roadmap(user, survey):
     """설문조사 기반 로드맵 생성"""
-    # 선호 난이도에 따른 레벨 범위 설정
+    # 선호 난이도에 따른 레벨 범위 설정 (1~26단계 균등 분배)
     difficulty_map = {
-        'easy': (1, 5),
-        'medium': (6, 10),
-        'hard': (11, 15)
+        'easy': (1, 9),      # 1단계 ~ 9단계
+        'medium': (10, 18),  # 10단계 ~ 18단계
+        'hard': (19, 26)     # 19단계 ~ 26단계
     }
-    min_level, max_level = difficulty_map.get(survey.preferred_difficulty, (1, 5))
+    min_level, max_level = difficulty_map.get(survey.preferred_difficulty, (1, 9))
 
     # 관심 분야 태그로 문제 필터링
     interested_tags = survey.interested_topics
@@ -301,6 +301,72 @@ def get_badges(request):
     })
 
 
+def initialize_badges():
+    """DB에 뱃지가 없으면 초기화"""
+    if Badge.objects.count() > 0:
+        return
+
+    # 뱃지 정의 (badge_type, name, description, icon)
+    badges_data = [
+        # 기본 배지
+        ('hello_world', 'Hello World!', '첫 코드 제출', '👋'),
+        ('first_problem', '첫 걸음', '첫 번째 문제 해결', '🎯'),
+        ('problems_10', '열정가', '문제 10개 해결', '🔥'),
+        ('problems_50', '도전자', '문제 50개 해결', '💪'),
+        ('problems_100', '백문불여일견', '문제 100개 해결', '🏆'),
+
+        # 연속 출석/문제 풀기
+        ('attendance_3days', '3일 출석', '3일 연속 출석', '📅'),
+        ('problem_streak_7', '일주일 챌린지', '7일 연속 문제 풀기', '🗓️'),
+        ('problem_streak_30', '한 달 챌린지', '30일 연속 문제 풀기', '📆'),
+
+        # 문법 마스터 시리즈
+        ('syntax_perfect', '문법 나치', '문법 오류 평균 0개', '✨'),
+        ('syntax_careful', '꼼꼼 감정사', '문법 오류 평균 1-2개', '🔍'),
+        ('syntax_racer', '오타 레이서', '문법 오류 평균 3-4개', '🏎️'),
+        ('syntax_typo_monster', '타이핑 괴물', '문법 오류 평균 5-6개', '⌨️'),
+        ('korean_grammar', '유사 한국인', '문법 오류 평균 7개 이상', '🇰🇷'),
+
+        # 코딩 실력 시리즈
+        ('skill_genius', '코딩 천재', '평균 알고리즘 패턴 일치도 80% 이상', '🧠'),
+        ('skill_master', '알고리즘 마스터', '평균 알고리즘 패턴 일치도 60-79%', '🎓'),
+        ('skill_steady', '꾸준러', '평균 알고리즘 패턴 일치도 40-59%', '🐢'),
+        ('skill_newbie', '코딩 새싹', '힌트를 1번 이상 요청', '🌱'),
+
+        # 논리 사고 시리즈
+        ('logic_king', '로직 킹', '평균 엣지 케이스 처리 4점 이상', '👑'),
+        ('logic_trial_error', '시행착오의 달인', '평균 엣지 케이스 처리 2.5-4점', '🔄'),
+        ('logic_action_first', '일단 고', '평균 엣지 케이스 처리 2.5점 미만', '🚀'),
+
+        # 특수 배지
+        ('no_hint_10', '자력갱생', '10개 문제 힌트 없이 해결', '💡'),
+        ('perfect_coder', '퍼펙트 코더', '완벽한 코드 작성자', '⭐'),
+        ('unbreakable', '불굴의 의지', '한 문제에 5번 이상 힌트 요청', '🔥'),
+        ('hint_collector', '힌트 수집가', '총 30회 이상 힌트 요청', '📚'),
+        ('persistence_king', '끈기왕', '어려운 문제 포기하지 않기', '💎'),
+        ('all_rounder', '만능 개발자', '모든 지표 평균 이상', '🌟'),
+
+        # 기타 배지
+        ('streak_7', '7일 연속 로그인', '7일 연속 로그인', '🔑'),
+        ('perfect_score', '만점왕', '모든 테스트 케이스 통과', '💯'),
+        ('all_easy', 'Easy 정복자', '모든 쉬운 문제 해결', '🎮'),
+        ('speed_master', '스피드 마스터', '빠른 문제 해결', '⚡'),
+        ('night_owl', '야행성', '자정 이후 문제 풀기', '🦉'),
+        ('button_mania', '버튼 마니아', '실행 버튼 50회 이상', '🔘'),
+    ]
+
+    for badge_type, name, description, icon in badges_data:
+        Badge.objects.get_or_create(
+            badge_type=badge_type,
+            defaults={
+                'name': name,
+                'description': description,
+                'icon': icon
+            }
+        )
+    print(f'[Badge] Initialized {len(badges_data)} badges')
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_badges(request):
@@ -308,6 +374,9 @@ def get_user_badges(request):
     from .badge_logic import get_user_badge_progress, BADGE_CONDITIONS
 
     user = request.user
+
+    # DB에 뱃지가 없으면 초기화
+    initialize_badges()
 
     # 모든 뱃지 가져오기
     all_badges = Badge.objects.all()
