@@ -46,11 +46,28 @@ class ChatMessage(models.Model):
         ('assistant', 'AI'),
     )
 
+    # 카테고리 분류 (개인화 통계용)
+    CATEGORY_CHOICES = [
+        ('git', 'Git'),
+        ('python', 'Python'),
+        ('general', 'General'),
+        ('unknown', 'Unknown'),
+    ]
+
     session = models.ForeignKey(
         ChatSession,
         on_delete=models.CASCADE,
         related_name='messages',
         verbose_name='세션'
+    )
+    # 사용자 직접 참조 추가 (세션 없이도 통계 가능)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='all_chat_messages',
+        verbose_name='사용자',
+        null=True,
+        blank=True
     )
     role = models.CharField(
         max_length=10,
@@ -70,7 +87,26 @@ class ChatMessage(models.Model):
         verbose_name='메타데이터',
         help_text='RAG 타입, 응답 시간 등 추가 정보'
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='생성일시')
+    # 개인화 필드 추가
+    category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default='unknown',
+        verbose_name='카테고리',
+        db_index=True
+    )
+    # 피드백 필드
+    is_helpful = models.BooleanField(
+        null=True,
+        blank=True,
+        verbose_name='도움 여부'
+    )
+    feedback_comment = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='피드백 코멘트'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='생성일시', db_index=True)
 
     class Meta:
         db_table = 'chat_messages'
@@ -78,6 +114,9 @@ class ChatMessage(models.Model):
         indexes = [
             models.Index(fields=['session', 'created_at']),
             models.Index(fields=['role']),
+            # 개인화 통계용 인덱스 추가
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['user', 'category']),
         ]
         verbose_name = '채팅 메시지'
         verbose_name_plural = '채팅 메시지 목록'

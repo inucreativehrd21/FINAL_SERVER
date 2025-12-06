@@ -240,3 +240,8 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('EMAIL_HOST_USER', 'noreply@pai.com')
+
+# Kakao OAuth
+KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY', '')
+KAKAO_CLIENT_SECRET = os.getenv('KAKAO_CLIENT_SECRET', '')
+KAKAO_REDIRECT_URI = os.getenv('KAKAO_REDIRECT_URI', 'http://localhost:3000/auth/kakao/callback')

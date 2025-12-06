@@ -55,14 +55,20 @@ function Login() {
   }
 
   const handleKakaoLogin = () => {
-    // TODO: 카카오 로그인 구현
-    alert('카카오 로그인은 추후 구현 예정입니다.')
+    // 카카오 OAuth URL 생성
+    const KAKAO_REST_API_KEY = 'f933dc8a2d5af1ac9a9258cb66196bdf'
+    const REDIRECT_URI = 'http://3.37.186.224/auth/kakao/callback'
+
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`
+
+    // 카카오 로그인 페이지로 리다이렉트
+    window.location.href = kakaoAuthUrl
   }
 
   return (
     <div className="login-page">
       <div className="login-container">
-        <div className="login-logo">π</div>
+        <div className="login-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>π</div>
 
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="error-message">{error}</div>}

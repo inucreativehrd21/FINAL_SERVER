@@ -14,6 +14,7 @@ urlpatterns = [
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('send-verification-email/', views.send_verification_email, name='send_verification_email'),
     path('verify-email-code/', views.verify_email_code, name='verify_email_code'),
+    path('kakao/login/', views.kakao_login, name='kakao_login'),
     path('user/', views.get_user_info, name='user_info'),
     path('user/update/', views.update_user_info, name='update_user'),
     path('user/password/', views.change_password, name='change_password'),

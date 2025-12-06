@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 RUNPOD_ENDPOINT_ID = os.environ.get('RUNPOD_ENDPOINT_ID', '')
 RUNPOD_API_KEY = os.environ.get('RUNPOD_API_KEY', '')
 RUNPOD_BASE_URL = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}"
+RUNPOD_HINT_URL = os.environ.get('RUNPOD_HINT_URL', '')
 
 # 문제 데이터 캐시
 _problems_cache = None
@@ -94,38 +95,30 @@ def _get_previous_hints(user_id: int, problem_id: str, limit: int = 5) -> List[s
 
 
 def _call_runpod(payload: Dict[str, Any], timeout: int = 60) -> Dict[str, Any]:
-    """Runpod Serverless API 호출"""
-    if not RUNPOD_ENDPOINT_ID or not RUNPOD_API_KEY:
-        raise ValueError("Runpod 설정이 없습니다. RUNPOD_ENDPOINT_ID, RUNPOD_API_KEY 환경변수를 설정하세요.")
+    """Runpod HTTP Flask 서버 호출"""
+    if not RUNPOD_HINT_URL:
+        raise ValueError("Runpod 설정이 없습니다. RUNPOD_HINT_URL 환경변수를 설정하세요.")
 
     headers = {
-        "Authorization": f"Bearer {RUNPOD_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    # 동기 실행 (runsync)
-    url = f"{RUNPOD_BASE_URL}/runsync"
+    # HTTP Flask 서버 엔드포인트
+    url = f"{RUNPOD_HINT_URL}/hint"
 
     try:
         response = requests.post(
             url,
             headers=headers,
-            json={"input": payload},
+            json=payload,
             timeout=timeout
         )
         response.raise_for_status()
 
         result = response.json()
 
-        # Runpod 응답 구조 처리
-        if result.get('status') == 'COMPLETED':
-            return result.get('output', {})
-        elif result.get('status') == 'FAILED':
-            raise Exception(f"Runpod 실행 실패: {result.get('error', 'Unknown error')}")
-        else:
-            # IN_QUEUE, IN_PROGRESS 등 - 폴링 필요
-            job_id = result.get('id')
-            return _poll_runpod_status(job_id, timeout)
+        # Flask 서버 응답 구조: {"success": bool, "data": {...}, "error": str}
+        return result
 
     except requests.exceptions.Timeout:
         raise Exception("Runpod 요청 시간 초과")
@@ -199,6 +192,21 @@ def request_hint_via_runpod(
         if not problem_data.get('title'):
             return (False, None, f"문제 ID {problem_id}를 찾을 수 없습니다.", 404)
 
+        # 1-1. 이전 힌트 기록 조회 (COH용)
+        last_hint = HintRequest.objects.filter(
+            user_id=user.id,
+            problem_str_id=problem_id,
+            is_langgraph=True
+        ).order_by('-created_at').first()
+
+        last_hint_info = {}
+        if last_hint:
+            last_hint_info = {
+                'code_hash': last_hint.code_hash or '',
+                'hint_branch': last_hint.hint_branch or '',
+                'coh_depth': last_hint.coh_depth or 0
+            }
+
         # 2. Runpod 요청 페이로드 구성
         payload = {
             "type": "hint",
@@ -208,7 +216,8 @@ def request_hint_via_runpod(
             "preset": preset,
             "custom_components": custom_components,
             "previous_hints": previous_hints,
-            "problem_data": problem_data
+            "problem_data": problem_data,
+            "last_hint_info": last_hint_info
         }
 
         # 3. Runpod 호출
@@ -265,7 +274,7 @@ def ping_runpod() -> Dict[str, Any]:
 
 def is_runpod_available() -> bool:
     """Runpod 설정이 되어있는지 확인"""
-    return bool(RUNPOD_ENDPOINT_ID and RUNPOD_API_KEY)
+    return bool(RUNPOD_HINT_URL)
 
 
 # Keep-Alive 스케줄러용 함수

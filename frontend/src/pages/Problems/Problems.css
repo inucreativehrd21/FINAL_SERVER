@@ -275,6 +275,44 @@
   font-size: 1rem;
 }
 
+/* 북마크 버튼 */
+.bookmark-col {
+  width: 80px;
+  min-width: 80px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.bookmark-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: #ccc;
+  transition: all 0.2s ease;
+}
+
+.bookmark-btn:hover {
+  color: #ffc107;
+  transform: scale(1.2);
+}
+
+.bookmark-btn.bookmarked {
+  color: #ffc107;
+}
+
+.bookmark-btn.bookmarked:hover {
+  color: #e0a800;
+}
+
+/* 별점 컬럼 */
+.star-column {
+  text-align: center;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
 /* 반응형 */
 @media (max-width: 1024px) {
   .filter-row {

@@ -182,14 +182,14 @@ def get_statistics(request):
 
     total_users = User.objects.filter(is_active=True).count()
 
-    # problems_final_cleaned.json 파일에서 문제 수 읽기
-    problems_json_path = Path(__file__).parent.parent / 'coding_test' / 'data' / 'problems_final_cleaned.json'
+    # problems_final_output.json 파일에서 문제 수 읽기
+    problems_json_path = Path(__file__).parent.parent / 'coding_test' / 'data' / 'problems_final_output.json'
     try:
         with open(problems_json_path, 'r', encoding='utf-8-sig') as f:
             problems_data = json.load(f)
             total_problems = len(problems_data)
     except Exception as e:
-        print(f"Error reading problems_final_cleaned.json: {e}")
+        print(f"Error reading problems_final_output.json: {e}")
         total_problems = 0
 
     return Response({

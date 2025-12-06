@@ -22,4 +22,9 @@ urlpatterns = [
     path('bookmarks/', views.get_bookmarks, name='bookmarks'),
     path('bookmark/', views.create_bookmark, name='create-bookmark'),
     path('bookmark/<int:bookmark_id>/', views.delete_bookmark, name='delete-bookmark'),
+
+    # 개인화 API (신규)
+    path('analytics/', views.chatbot_analytics, name='chatbot-analytics'),
+    path('history/', views.chatbot_history, name='chatbot-history'),
+    path('feedback/', views.chatbot_feedback, name='chatbot-feedback'),
 ]

@@ -16,6 +16,7 @@ from .serializers import (
 )
 from django.core.mail import send_mail
 from django.conf import settings
+import requests
 
 
 @api_view(['POST'])
@@ -344,3 +345,107 @@ def verify_email_code(request):
     return success_response(
         message="이메일 인증이 완료되었습니다."
     )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def kakao_login(request):
+    """카카오 로그인 - 인가 코드로 토큰 받기"""
+    code = request.data.get('code')
+
+    if not code:
+        return error_response(
+            message="인가 코드가 필요합니다.",
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # 카카오 토큰 요청
+        token_url = "https://kauth.kakao.com/oauth/token"
+        token_data = {
+            "grant_type": "authorization_code",
+            "client_id": settings.KAKAO_REST_API_KEY,
+            "client_secret": settings.KAKAO_CLIENT_SECRET,
+            "redirect_uri": settings.KAKAO_REDIRECT_URI,
+            "code": code
+        }
+
+        token_response = requests.post(token_url, data=token_data)
+        token_json = token_response.json()
+
+        if "error" in token_json:
+            return error_response(
+                message="카카오 토큰 발급에 실패했습니다.",
+                details=token_json,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        access_token = token_json.get("access_token")
+
+        # 카카오 사용자 정보 요청
+        user_info_url = "https://kapi.kakao.com/v2/user/me"
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+        user_info_response = requests.get(user_info_url, headers=headers)
+        user_info = user_info_response.json()
+
+        if "id" not in user_info:
+            return error_response(
+                message="카카오 사용자 정보를 가져오는데 실패했습니다.",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 카카오 ID로 사용자 찾기 또는 생성
+        kakao_id = str(user_info["id"])
+        kakao_account = user_info.get("kakao_account", {})
+        profile = kakao_account.get("profile", {})
+
+        # username은 kakao_id를 사용
+        username = f"kakao_{kakao_id}"
+
+        # 이메일 (선택 동의 항목이므로 없을 수 있음)
+        email = kakao_account.get("email", f"{username}@kakao.user")
+
+        # 닉네임
+        nickname = profile.get("nickname", f"카카오유저_{kakao_id[:8]}")
+
+        # 기존 사용자 확인
+        user = User.objects.filter(username=username).first()
+
+        if not user:
+            # 새 사용자 생성
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                nickname=nickname,
+                name=nickname,  # 실명은 카카오에서 제공하지 않으므로 nickname 사용
+            )
+            # 카카오 로그인 사용자는 비밀번호 불필요
+            user.set_unusable_password()
+            user.save()
+
+        # JWT 토큰 생성
+        refresh = RefreshToken.for_user(user)
+
+        user_data = UserSerializer(user).data
+
+        return success_response(
+            data={
+                "user": user_data,
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh)
+                }
+            },
+            message="카카오 로그인에 성공했습니다."
+        )
+
+    except Exception as e:
+        print(f"[카카오 로그인 오류] {str(e)}")
+        return error_response(
+            message="카카오 로그인 처리 중 오류가 발생했습니다.",
+            details=str(e),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

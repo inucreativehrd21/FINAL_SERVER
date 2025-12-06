@@ -94,8 +94,8 @@ function Problems() {
   }
 
   const getProblemStatus = (problemId) => {
-    // 1. ProblemStatus에서 별점(star_count) 확인
-    const problemStatus = problemStatuses.find(ps => ps.problem_id === problemId)
+    // 1. ProblemStatus에서 별점(star_count) 확인 (타입 통일: String 비교)
+    const problemStatus = problemStatuses.find(ps => String(ps.problem_id) === String(problemId))
     if (problemStatus && problemStatus.star_count !== undefined) {
       // 별점이 있으면 star_1, star_2, star_3 반환
       const starCount = problemStatus.star_count || 0
@@ -105,7 +105,7 @@ function Problems() {
     }
 
     // 2. 제출 기록 또는 localStorage에 저장된 코드가 있으면 '푸는 중'
-    const problemSubmissions = submissions.filter(s => s.problem_id === problemId)
+    const problemSubmissions = submissions.filter(s => String(s.problem_id) === String(problemId))
     if (problemSubmissions.length > 0) return 'in_progress'
 
     // 3. localStorage에 저장된 코드가 있는지 확인
@@ -350,44 +350,54 @@ function Problems() {
               <th>문제명</th>
               <th>단계</th>
               <th>분류</th>
+              <th>별점</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="loading-cell">문제를 불러오는 중...</td>
+                <td colSpan="7" className="loading-cell">문제를 불러오는 중...</td>
               </tr>
             ) : filteredProblems.length === 0 ? (
               <tr>
-                <td colSpan="6" className="empty-cell">조건에 맞는 문제가 없습니다.</td>
+                <td colSpan="7" className="empty-cell">조건에 맞는 문제가 없습니다.</td>
               </tr>
             ) : (
-              filteredProblems.map((problem, index) => (
-                <tr key={problem.problem_id}>
-                  <td className="bookmark-col">
-                    <button
-                      className={`bookmark-btn ${isBookmarked(problem.problem_id) ? 'bookmarked' : ''}`}
-                      onClick={(e) => handleToggleBookmark(e, problem.problem_id)}
-                      title={isBookmarked(problem.problem_id) ? '북마크 해제' : '북마크 추가'}
-                    >
-                      {isBookmarked(problem.problem_id) ? '★' : '☆'}
-                    </button>
-                  </td>
-                  <td>{problem.problem_id}</td>
-                  <td className="problem-title-cell">{problem.title}</td>
-                  <td>{problem.level}</td>
-                  <td>{problem.category || '-'}</td>
-                  <td>
-                    <button
-                      className="action-btn"
-                      onClick={() => handleProblemClick(problem.problem_id)}
-                    >
-                      시작하기
-                    </button>
-                  </td>
-                </tr>
-              ))
+              filteredProblems.map((problem) => {
+                const status = getProblemStatus(problem.problem_id)
+                return (
+                  <tr key={problem.problem_id}>
+                    <td className="bookmark-col">
+                      <button
+                        className={`bookmark-btn ${isBookmarked(problem.problem_id) ? 'bookmarked' : ''}`}
+                        onClick={(e) => handleToggleBookmark(e, problem.problem_id)}
+                        title={isBookmarked(problem.problem_id) ? '북마크 해제' : '북마크 추가'}
+                      >
+                        {isBookmarked(problem.problem_id) ? '★' : '☆'}
+                      </button>
+                    </td>
+                    <td>{problem.problem_id}</td>
+                    <td className="problem-title-cell">{problem.title}</td>
+                    <td>{problem.level}</td>
+                    <td>{problem.category || '-'}</td>
+                    <td className="star-column">
+                      {status === 'star_3' ? '⭐⭐⭐' :
+                       status === 'star_2' ? '⭐⭐' :
+                       status === 'star_1' ? '⭐' :
+                       status === 'in_progress' ? '🔄' : '-'}
+                    </td>
+                    <td>
+                      <button
+                        className="action-btn"
+                        onClick={() => handleProblemClick(problem.problem_id)}
+                      >
+                        시작하기
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>

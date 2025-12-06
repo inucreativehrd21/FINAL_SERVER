@@ -205,6 +205,17 @@
   display: block;
 }
 
+.roadmap-hint {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.5rem;
+}
+
+.no-roadmap-notice {
+  text-align: center;
+}
+
 /* 액션 버튼들 */
 .action-buttons-section {
   display: grid;
@@ -275,11 +286,62 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.problems-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
 .problems-list-section h3 {
   font-size: 1.2rem;
   font-weight: 600;
   color: #333;
-  margin-bottom: 1.5rem;
+  margin: 0;
+}
+
+.problems-list-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.problems-list-tabs .tab-btn {
+  padding: 0.5rem 1rem;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.problems-list-tabs .tab-btn:hover {
+  background: #e0e0e0;
+}
+
+.problems-list-tabs .tab-btn.active {
+  background: #333;
+  color: white;
+}
+
+.clickable-problem {
+  cursor: pointer;
+  color: #333;
+  transition: color 0.2s;
+}
+
+.clickable-problem:hover {
+  color: #000;
+  text-decoration: underline;
+}
+
+.bookmark-star {
+  color: #ffc107;
+  font-size: 1.2rem;
 }
 
 .problems-table-container {
@@ -425,8 +487,7 @@
   font-size: 0.9rem;
 }
 
-.edit-btn,
-.save-btn {
+.edit-btn {
   padding: 0.75rem 1.5rem;
   background: #000000;
   color: white;
@@ -439,8 +500,7 @@
   margin-top: 1rem;
 }
 
-.edit-btn:hover,
-.save-btn:hover {
+.edit-btn:hover {
   transform: translateY(-2px);
   background: #1a1a1a;
 }
@@ -485,22 +545,43 @@
 
 .form-actions {
   display: flex;
+  justify-content: flex-end;
+  align-items: center;
   gap: 0.75rem;
+  margin-top: 1.5rem;
 }
 
-.cancel-btn {
-  padding: 0.75rem 1.5rem;
-  background: #f0f0f0;
-  color: #666;
+.form-actions .save-btn,
+.form-actions .cancel-btn {
+  padding: 0 2rem;
   border: none;
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s;
+  height: 48px;
+  min-width: 100px;
+  line-height: 48px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
-.cancel-btn:hover {
+.form-actions .save-btn {
+  background: #333;
+  color: white;
+}
+
+.form-actions .save-btn:hover {
+  background: #1a1a1a;
+}
+
+.form-actions .cancel-btn {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.form-actions .cancel-btn:hover {
   background: #e0e0e0;
 }
 
@@ -509,6 +590,24 @@
   font-weight: bold;
   margin-bottom: 1.5rem;
   color: #333;
+}
+
+.password-section .save-btn {
+  width: 100%;
+  padding: 0.875rem;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 0.5rem;
+}
+
+.password-section .save-btn:hover {
+  background: #1a1a1a;
 }
 
 /* Empty State */
@@ -699,6 +798,78 @@
 }
 
 /* Bookmarks Section */
+.bookmarks-section .bookmarks-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.bookmarks-section .bookmarks-header .back-btn {
+  background: #333;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bookmarks-section .bookmarks-header .back-btn:hover {
+  background: #444;
+  color: white;
+}
+
+.bookmarks-section .bookmarks-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Bookmark Sub-tabs */
+.bookmark-sub-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding: 0.5rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.bookmark-sub-tabs .sub-tab {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bookmark-sub-tabs .sub-tab:hover {
+  background: #e8e8e8;
+  color: #333;
+}
+
+.bookmark-sub-tabs .sub-tab.active {
+  background: #333;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Bookmark Tab Content */
+.bookmark-tab-content {
+  min-height: 200px;
+}
+
 .bookmarks-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -721,6 +892,81 @@
 .bookmark-date {
   font-size: 0.85rem;
   color: #999;
+}
+
+/* Chatbot Bookmarks List */
+.bookmarks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.chatbot-bookmark-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #000000;
+  overflow: hidden;
+}
+
+.chatbot-bookmark-item .bookmark-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f0f0f0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.chatbot-bookmark-item .bookmark-date {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.bookmark-delete-btn {
+  background: #ff4757;
+  color: white;
+  border: none;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.bookmark-delete-btn:hover {
+  background: #ff3838;
+}
+
+.bookmark-content {
+  padding: 1rem;
+  position: relative;
+}
+
+.bookmark-content.clickable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.bookmark-content.clickable:hover {
+  background: #f0f0f0;
+}
+
+.bookmark-content p {
+  color: #333;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.expand-indicator {
+  display: block;
+  margin-top: 0.75rem;
+  color: #666;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
 }
 
 /* Responsive */

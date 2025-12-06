@@ -13,12 +13,15 @@ function MyPage() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [previousTab, setPreviousTab] = useState('dashboard')
   const [stats, setStats] = useState(null)
-  const [solvedProblems, setSolvedProblems] = useState([])
-  const [bookmarks, setBookmarks] = useState([])
+  const [bookmarks, setBookmarks] = useState([]) // 챗봇 북마크
+  const [problemBookmarks, setProblemBookmarks] = useState([]) // 문제 북마크
   const [userBadges, setUserBadges] = useState([])
   const [allBadges, setAllBadges] = useState([])
   const [hoveredBadge, setHoveredBadge] = useState(null)
+  const [expandedBookmarks, setExpandedBookmarks] = useState({})
+  const [bookmarkSubTab, setBookmarkSubTab] = useState('problems') // 'problems' | 'chatbot'
   const [goalProgress, setGoalProgress] = useState(0)
+  const [roadmapInfo, setRoadmapInfo] = useState(null) // 로드맵 정보 (총 문제 수, 완료 수)
   const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -32,8 +35,8 @@ function MyPage() {
 
   useEffect(() => {
     fetchUserStats()
-    fetchSolvedProblems()
     fetchBookmarks()
+    fetchProblemBookmarks()
     fetchBadges()
     fetchGoalProgress()
   }, [])
@@ -47,15 +50,6 @@ function MyPage() {
     }
   }
 
-  const fetchSolvedProblems = async () => {
-    try {
-      const response = await api.get('/coding-test/solved/')
-      setSolvedProblems(response.data.data || [])
-    } catch (error) {
-      console.error('Failed to fetch solved problems:', error)
-    }
-  }
-
   const fetchBookmarks = async () => {
     try {
       const response = await api.get('/chatbot/bookmarks/')
@@ -63,6 +57,56 @@ function MyPage() {
     } catch (error) {
       console.error('Failed to fetch bookmarks:', error)
     }
+  }
+
+  const fetchProblemBookmarks = async () => {
+    try {
+      const response = await api.get('/coding-test/bookmarks/')
+      if (response.data.success) {
+        setProblemBookmarks(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch problem bookmarks:', error)
+    }
+  }
+
+  const handleRemoveProblemBookmark = async (problemId) => {
+    try {
+      const response = await api.post('/coding-test/bookmarks/toggle/', {
+        problem_id: problemId
+      })
+      if (response.data.success) {
+        setProblemBookmarks(prev => prev.filter(bm => bm.problem_id !== problemId))
+      }
+    } catch (error) {
+      console.error('Failed to remove problem bookmark:', error)
+    }
+  }
+
+  const handleRemoveChatbotBookmark = async (bookmarkId) => {
+    if (!window.confirm('이 북마크를 삭제하시겠습니까?')) {
+      return
+    }
+    try {
+      await api.delete(`/chatbot/bookmark/${bookmarkId}/`)
+      setBookmarks(prev => prev.filter(bm => bm.id !== bookmarkId))
+      // 확장 상태도 제거
+      setExpandedBookmarks(prev => {
+        const newState = { ...prev }
+        delete newState[bookmarkId]
+        return newState
+      })
+    } catch (error) {
+      console.error('Failed to remove chatbot bookmark:', error)
+      alert('북마크 삭제에 실패했습니다.')
+    }
+  }
+
+  const toggleBookmarkExpand = (bookmarkId) => {
+    setExpandedBookmarks(prev => ({
+      ...prev,
+      [bookmarkId]: !prev[bookmarkId]
+    }))
   }
 
   const fetchBadges = async () => {
@@ -90,17 +134,45 @@ function MyPage() {
 
   const fetchGoalProgress = async () => {
     try {
-      // TODO: 실제 목표 API 엔드포인트로 변경 필요
-      // const response = await api.get('/mypage/goal-progress/')
-      // setGoalProgress(response.data.data.progress || 0)
+      // 1. 활성화된 로드맵 조회
+      const roadmapRes = await api.get('/coding-test/roadmap/')
+      if (!roadmapRes.data.success) {
+        // 로드맵이 없으면 기본값 유지
+        setGoalProgress(0)
+        setRoadmapInfo(null)
+        return
+      }
 
-      // 임시: solved_count 기반 계산 (예: 목표가 100개 문제라고 가정)
-      const targetGoal = 100
-      const currentProgress = stats?.solved_count || user?.solved_count || 0
-      const percentage = Math.min(100, Math.round((currentProgress / targetGoal) * 100))
+      const roadmap = roadmapRes.data.data.roadmap
+      const recommendedProblems = roadmap.recommended_problems || []
+
+      if (recommendedProblems.length === 0) {
+        setGoalProgress(0)
+        setRoadmapInfo({ total: 0, completed: 0 })
+        return
+      }
+
+      // 2. 사용자의 ProblemStatus 조회
+      const statusRes = await api.get('/coding-test/problem-statuses/')
+      const problemStatuses = statusRes.data.success ? (statusRes.data.data || []) : []
+
+      // 3. 로드맵 추천 문제 중 완료된 문제 수 계산 (star_count >= 1)
+      const completedProblems = recommendedProblems.filter(problemId => {
+        const status = problemStatuses.find(ps => ps.problem_id === problemId)
+        return status && status.star_count >= 1
+      })
+
+      const totalCount = recommendedProblems.length
+      const completedCount = completedProblems.length
+      const percentage = Math.round((completedCount / totalCount) * 100)
+
       setGoalProgress(percentage)
+      setRoadmapInfo({ total: totalCount, completed: completedCount })
     } catch (error) {
       console.error('Failed to fetch goal progress:', error)
+      // 에러 시 기본값
+      setGoalProgress(0)
+      setRoadmapInfo(null)
     }
   }
 
@@ -243,22 +315,36 @@ function MyPage() {
                 <div className="charts-container">
                   <div className="pie-chart-section">
                     <h3>목표 대비 완료 비율</h3>
-                    <svg viewBox="0 0 200 200" className="pie-chart">
-                      <circle cx="100" cy="100" r="80" fill="none" stroke="#e0e0e0" strokeWidth="40" />
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="80"
-                        fill="none"
-                        stroke="#ff7f7f"
-                        strokeWidth="40"
-                        strokeDasharray={`${(goalProgress / 100) * 502.4} 502.4`}
-                        transform="rotate(-90 100 100)"
-                      />
-                      <text x="100" y="110" textAnchor="middle" fontSize="36" fontWeight="bold" fill="#333">
-                        {goalProgress}%
-                      </text>
-                    </svg>
+                    {roadmapInfo ? (
+                      <>
+                        <svg viewBox="0 0 200 200" className="pie-chart">
+                          <circle cx="100" cy="100" r="80" fill="none" stroke="#e0e0e0" strokeWidth="40" />
+                          <circle
+                            cx="100"
+                            cy="100"
+                            r="80"
+                            fill="none"
+                            stroke="#ff7f7f"
+                            strokeWidth="40"
+                            strokeDasharray={`${(goalProgress / 100) * 502.4} 502.4`}
+                            transform="rotate(-90 100 100)"
+                          />
+                          <text x="100" y="100" textAnchor="middle" fontSize="36" fontWeight="bold" fill="#333">
+                            {goalProgress}%
+                          </text>
+                          <text x="100" y="130" textAnchor="middle" fontSize="14" fill="#666">
+                            {roadmapInfo.completed}/{roadmapInfo.total}문제
+                          </text>
+                        </svg>
+                      </>
+                    ) : (
+                      <svg viewBox="0 0 200 200" className="pie-chart">
+                        <circle cx="100" cy="100" r="80" fill="none" stroke="#e0e0e0" strokeWidth="40" />
+                        <text x="100" y="110" textAnchor="middle" fontSize="16" fill="#999">
+                          로드맵 없음
+                        </text>
+                      </svg>
+                    )}
                   </div>
 
                   <div className="radar-chart-section">
@@ -277,23 +363,23 @@ function MyPage() {
                             fullMark: 100
                           },
                           {
+                            subject: '실행 속도',
+                            value: Math.max(0, 100 - ((stats?.metrics?.avg_execution_time || 0) / 10)),
+                            fullMark: 100
+                          },
+                          {
+                            subject: '메모리 효율',
+                            value: Math.max(0, 100 - ((stats?.metrics?.avg_memory_usage || 0) / 100)),
+                            fullMark: 100
+                          },
+                          {
                             subject: '코드 품질',
                             value: stats?.metrics?.avg_code_quality_score || 0,
                             fullMark: 100
                           },
                           {
-                            subject: '패턴 일치도',
-                            value: stats?.metrics?.avg_algorithm_pattern_match || 0,
-                            fullMark: 100
-                          },
-                          {
                             subject: 'PEP8 준수',
                             value: Math.max(0, 100 - (stats?.metrics?.avg_pep8_violations || 0) * 5),
-                            fullMark: 100
-                          },
-                          {
-                            subject: '코드 간결성',
-                            value: Math.max(0, 100 - (stats?.metrics?.avg_code_complexity || 0) * 5),
                             fullMark: 100
                           }
                         ]}
@@ -352,46 +438,29 @@ function MyPage() {
                 </div>
               </div>
 
-              {/* 하단 - 문제 리스트 */}
-              <div className="problems-list-section">
-                <h3>📋 내가 푼 문제리스트</h3>
-                <div className="problems-table-container">
-                  {solvedProblems.length === 0 ? (
-                    <div className="empty-state-table">
-                      <p>아직 해결한 문제가 없습니다.</p>
-                    </div>
-                  ) : (
-                    <table className="problems-table">
-                      <thead>
-                        <tr>
-                          <th>📄</th>
-                          <th>문제명</th>
-                          <th>해결일</th>
-                          <th>🗑️</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {solvedProblems.slice(0, 3).map((problem, index) => (
-                          <tr key={problem.id}>
-                            <td>📄</td>
-                            <td>{problem.title}</td>
-                            <td>{problem.solved_at ? new Date(problem.solved_at).toLocaleDateString() : '-'}</td>
-                            <td>
-                              <button className="delete-icon-btn" title="삭제">🗑️</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
             </>
           )}
 
           {activeTab === 'settings' && (
             <div className="settings-content">
-              <h2>개인 정보 수정</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <button
+                  className="back-btn"
+                  onClick={() => setActiveTab('dashboard')}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#000',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    marginBottom: '2rem'
+                  }}
+                >
+                  ← 뒤로가기
+                </button>
+                <h2>개인 정보 수정</h2>
+              </div>
 
               <div className="profile-card">
                 <div className="profile-header">
@@ -625,39 +694,131 @@ function MyPage() {
 
           {activeTab === 'bookmarks' && (
             <div className="bookmarks-section">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              {/* 헤더: 뒤로가기 + 제목 */}
+              <div className="bookmarks-header">
                 <button
                   className="back-btn"
                   onClick={() => setActiveTab(previousTab)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#000',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer', 
-                    marginBottom: '2rem'
-                  }}
                 >
                   ← 뒤로가기
                 </button>
-                <h2>북마크 ({bookmarks.length}개)</h2>
+                <h2>북마크</h2>
               </div>
-              {bookmarks.length === 0 ? (
-                <div className="empty-state">
-                  <p>저장된 북마크가 없습니다.</p>
-                  <p className="hint">챗봇 응답을 북마크해보세요!</p>
-                </div>
-              ) : (
-                <div className="bookmarks-grid">
-                  {bookmarks.map((bookmark) => (
-                    <div key={bookmark.id} className="bookmark-item">
-                      <p>{bookmark.content}</p>
-                      <div className="bookmark-date">
-                        {bookmark.created_at ? new Date(bookmark.created_at).toLocaleDateString() : ''}
-                      </div>
+
+              {/* 서브 탭 */}
+              <div className="bookmark-sub-tabs">
+                <button
+                  className={`sub-tab ${bookmarkSubTab === 'problems' ? 'active' : ''}`}
+                  onClick={() => setBookmarkSubTab('problems')}
+                >
+                  문제 ({problemBookmarks.length})
+                </button>
+                <button
+                  className={`sub-tab ${bookmarkSubTab === 'chatbot' ? 'active' : ''}`}
+                  onClick={() => setBookmarkSubTab('chatbot')}
+                >
+                  챗봇 응답 ({bookmarks.length})
+                </button>
+              </div>
+
+              {/* 문제 북마크 탭 */}
+              {bookmarkSubTab === 'problems' && (
+                <div className="bookmark-tab-content">
+                  {problemBookmarks.length === 0 ? (
+                    <div className="empty-state">
+                      <p>북마크한 문제가 없습니다.</p>
+                      <p className="hint">문제 리스트에서 ☆를 눌러 북마크해보세요!</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="problems-table-container">
+                      <table className="problems-table">
+                        <thead>
+                          <tr>
+                            <th>★</th>
+                            <th>문제명</th>
+                            <th>단계</th>
+                            <th>북마크일</th>
+                            <th>삭제</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {problemBookmarks.map((bookmark) => (
+                            <tr key={bookmark.id}>
+                              <td className="bookmark-star">★</td>
+                              <td
+                                className="clickable-problem"
+                                onClick={() => navigate(`/app/coding-test/${bookmark.problem_id}`)}
+                              >
+                                {bookmark.problem_title}
+                              </td>
+                              <td>{bookmark.problem_level}</td>
+                              <td>{new Date(bookmark.created_at).toLocaleDateString()}</td>
+                              <td>
+                                <button
+                                  className="delete-icon-btn"
+                                  title="북마크 해제"
+                                  onClick={() => handleRemoveProblemBookmark(bookmark.problem_id)}
+                                >
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 챗봇 응답 북마크 탭 */}
+              {bookmarkSubTab === 'chatbot' && (
+                <div className="bookmark-tab-content">
+                  {bookmarks.length === 0 ? (
+                    <div className="empty-state">
+                      <p>저장된 챗봇 응답이 없습니다.</p>
+                      <p className="hint">챗봇 응답을 북마크해보세요!</p>
+                    </div>
+                  ) : (
+                    <div className="bookmarks-list">
+                      {bookmarks.map((bookmark) => {
+                        const isExpanded = expandedBookmarks[bookmark.id]
+                        const content = bookmark.content || ''
+                        const isLong = content.length > 150
+                        const displayContent = isExpanded || !isLong
+                          ? content
+                          : content.slice(0, 150) + '...'
+
+                        return (
+                          <div key={bookmark.id} className="chatbot-bookmark-item">
+                            <div className="bookmark-header">
+                              <div className="bookmark-date">
+                                {bookmark.created_at ? new Date(bookmark.created_at).toLocaleDateString() : ''}
+                              </div>
+                              <button
+                                className="bookmark-delete-btn"
+                                onClick={() => handleRemoveChatbotBookmark(bookmark.id)}
+                                title="북마크 삭제"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                            <div
+                              className={`bookmark-content ${isLong ? 'clickable' : ''}`}
+                              onClick={() => isLong && toggleBookmarkExpand(bookmark.id)}
+                            >
+                              <p>{displayContent}</p>
+                              {isLong && (
+                                <span className="expand-indicator">
+                                  {isExpanded ? '접기 ▲' : '더보기 ▼'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

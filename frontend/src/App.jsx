@@ -39,7 +39,7 @@ function App() {
       <Route path="/signup" element={<Signup />} />
 
       {/* 카카오 로그인 콜백 */}
-      <Route path="/oauth/kakao/callback" element={<KakaoCallback />} />
+      <Route path="/auth/kakao/callback" element={<KakaoCallback />} />
 
       {/* 인증된 사용자만 접근 가능한 페이지 */}
       <Route

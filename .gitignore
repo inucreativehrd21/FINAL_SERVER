@@ -101,3 +101,4 @@ credentials/
 
 # Nginx dynamic config
 nginx/conf.d/
+local/
