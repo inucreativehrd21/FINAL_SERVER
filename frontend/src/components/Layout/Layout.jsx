@@ -5,6 +5,7 @@ import React from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '@store/authSlice'
+import api from '@services/api'
 import './Layout.css'
 
 const Layout = () => {
@@ -12,9 +13,23 @@ const Layout = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
-  const handleLogout = () => {
-    dispatch(logout())
-    navigate('/')
+  const handleLogout = async () => {
+    try {
+      // 서버에 로그아웃 요청 (refresh 토큰 블랙리스트 등록)
+      const refreshToken = localStorage.getItem('refreshToken')
+      if (refreshToken) {
+        await api.post('/auth/logout/', {
+          refresh: refreshToken
+        })
+      }
+    } catch (error) {
+      console.error('Server logout failed:', error)
+      // 서버 로그아웃 실패해도 클라이언트 로그아웃은 진행
+    } finally {
+      // 클라이언트 로그아웃 (토큰 삭제 및 상태 초기화)
+      dispatch(logout())
+      navigate('/')
+    }
   }
 
   const handleLogoClick = () => {
