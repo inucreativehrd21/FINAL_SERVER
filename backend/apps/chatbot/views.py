@@ -9,11 +9,13 @@ RunPod RAG 시스템과 통합된 챗봇 API - 환경변수 호환성 개선
 import os
 import logging
 import requests
+from datetime import datetime, timedelta
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.db.models import Count
 
 from .models import ChatSession, ChatMessage, ChatBookmark
 from .serializers import (
@@ -22,6 +24,8 @@ from .serializers import (
     ChatMessageSerializer,
     ChatBookmarkSerializer
 )
+# Import UserSurvey for personalization
+from apps.coding_test.models import UserSurvey
 
 logger = logging.getLogger(__name__)
 
@@ -115,10 +119,37 @@ def chat(request):
             'error': 'RAG 서버가 설정되지 않았습니다. 관리자에게 문의하세요.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # 5. RunPod RAG 호출
+    # 4-1. 개인화: UserSurvey에서 사용자 컨텍스트 가져오기
+    user_context = {}
+    try:
+        survey = UserSurvey.objects.filter(user=request.user).first()
+        if survey:
+            # learning_goals와 interested_topics는 JSONField (list)
+            # 문자열로 변환 (쉼표로 구분)
+            learning_goals_str = ""
+            interested_topics_str = ""
+
+            if survey.learning_goals and isinstance(survey.learning_goals, list):
+                learning_goals_str = ", ".join(survey.learning_goals)
+
+            if survey.interested_topics and isinstance(survey.interested_topics, list):
+                interested_topics_str = ", ".join(survey.interested_topics)
+
+            user_context = {
+                "learning_goals": learning_goals_str,
+                "interested_topics": interested_topics_str,
+            }
+            logger.info(f"[Chat] User context loaded: learning_goals={bool(learning_goals_str)}, interested_topics={bool(interested_topics_str)}")
+    except Exception as e:
+        logger.warning(f"[Chat] Failed to load user context: {e}")
+        # Continue without personalization if UserSurvey fails
+
+    # 5. RunPod RAG 호출 (개인화 파라미터 추가)
     payload = {
         'question': message,
         'user_id': str(request.user.id),
+        'user_context': user_context,  # NEW: 개인화 컨텍스트
+        'enable_personalization': True,  # NEW: 개인화 활성화
         'chat_history': chat_history,
         'session_id': str(session.id)
     }
@@ -141,19 +172,27 @@ def chat(request):
                 # 카테고리 자동 분류
                 question_category = classify_question_category(message)
 
+                # 개인화: related_questions 추출
+                related_questions = result.get('related_questions', [])
+
+                # metadata에 related_questions 저장
+                metadata = result.get('metadata', {})
+                metadata['related_questions'] = related_questions
+
                 assistant_message = ChatMessage.objects.create(
                     session=session,
                     user=request.user,  # 개인화: user 필드 추가
                     role='assistant',
                     content=result.get('answer', ''),
                     sources=result.get('sources', []),
-                    metadata=result.get('metadata', {}),
+                    metadata=metadata,  # 개인화: related_questions 포함
                     category=question_category  # 개인화: category 자동 분류
                 )
 
                 logger.info(
                     f"[Chat] Response saved: message_id={assistant_message.id}, "
                     f"sources={len(result.get('sources', []))}, "
+                    f"related_questions={len(related_questions)}, "
                     f"rag_type={result.get('metadata', {}).get('rag_type', 'unknown')}"
                 )
 
@@ -163,7 +202,8 @@ def chat(request):
                     'message_id': assistant_message.id,
                     'data': {
                         'response': result.get('answer'),
-                        'sources': result.get('sources', [])
+                        'sources': result.get('sources', []),
+                        'related_questions': related_questions  # 개인화: 관련 질문 반환
                     }
                 })
             else:
